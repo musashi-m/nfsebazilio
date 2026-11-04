@@ -83,6 +83,7 @@ class CertService {
 
       let certPem = null;
       let keyPem = null;
+      let caPems = [];
       let parseError = null;
 
       // 1. Tenta extrair usando OpenSSL 3 (suporta todos os algoritmos modernos do Windows: PBES2, AES-256-CBC, PBKDF2)
@@ -91,6 +92,7 @@ class CertService {
           const extracted = this._extractWithOpenSSL(pfxBuffer, password);
           certPem = extracted.certPem;
           keyPem = extracted.keyPem;
+          caPems = extracted.caPems || [];
         } catch (osslErr) {
           parseError = osslErr;
         }
@@ -102,6 +104,7 @@ class CertService {
           const extractedForge = this._extractWithForge(pfxBuffer, password);
           certPem = extractedForge.certPem;
           keyPem = extractedForge.keyPem;
+          caPems = extractedForge.caPems || [];
         } catch (forgeErr) {
           if (!parseError) parseError = forgeErr;
         }
@@ -113,7 +116,7 @@ class CertService {
 
       // 3. Lê os metadados do certificado via Node.js nativo (crypto.X509Certificate)
       const x509 = new crypto.X509Certificate(certPem);
-      const certInfo = this._buildCertMetadata(x509, certPem, keyPem, pfxBuffer, password);
+      const certInfo = this._buildCertMetadata(x509, certPem, keyPem, pfxBuffer, password, caPems);
 
       this.activeCert = certInfo;
 
@@ -207,9 +210,12 @@ class CertService {
         leafCertPem = allCerts[0];
       }
 
+      const caPems = allCerts.filter(c => c !== leafCertPem);
+
       return {
         certPem: leafCertPem,
-        keyPem: keyMatch[0]
+        keyPem: keyMatch[0],
+        caPems
       };
     } finally {
       if (fs.existsSync(tempPfxPath)) {
@@ -290,16 +296,21 @@ class CertService {
       chosenCert = certCandidates[0].cert;
     }
 
+    const caPems = certCandidates
+      .filter(c => c.cert !== chosenCert)
+      .map(c => forge.pki.certificateToPem(c.cert));
+
     return {
       certPem: forge.pki.certificateToPem(chosenCert),
-      keyPem: forge.pki.privateKeyToPem(privateKey)
+      keyPem: forge.pki.privateKeyToPem(privateKey),
+      caPems
     };
   }
 
   /**
    * Constrói metadados completos a partir do X509Certificate
    */
-  _buildCertMetadata(x509, certPem, keyPem, pfxBuffer, password) {
+  _buildCertMetadata(x509, certPem, keyPem, pfxBuffer, password, caPems = []) {
     const subject = x509.subject || '';
     const rawIssuer = x509.issuer || '';
 
@@ -370,6 +381,7 @@ class CertService {
       isValid,
       certPem,
       keyPem,
+      caPems,
       pfxBuffer,
       password
     };

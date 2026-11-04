@@ -45,25 +45,17 @@ class AdnService {
       secureOptions: (crypto.constants.SSL_OP_LEGACY_SERVER_CONNECT || 0) | (crypto.constants.SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION || 0)
     };
 
-    // 1. Prioridade máxima: PFX direto (inclui a cadeia completa de ACs da ICP-Brasil necessária no Linux)
-    if (certData.pfxBuffer && certData.password !== undefined) {
-      return new https.Agent({
-        ...baseTlsOptions,
-        pfx: certData.pfxBuffer,
-        passphrase: certData.password || '',
-        timeout: 30000
-      });
-    }
+    // Monta a cadeia completa para o mTLS da Receita Federal:
+    // [Certificado Titular ICP-Brasil, ...Certificados Intermediários das Autoridades Certificadoras]
+    const certChain = [certData.certPem, ...(certData.caPems || [])];
 
-    // 2. Fallback para chaves PEM avulsas
-    if (certData.keyPem && certData.certPem) {
-      return new https.Agent({
-        ...baseTlsOptions,
-        key: certData.keyPem,
-        cert: certData.certPem,
-        timeout: 30000
-      });
-    }
+    return new https.Agent({
+      ...baseTlsOptions,
+      key: certData.keyPem,
+      cert: certChain,
+      ca: certData.caPems && certData.caPems.length > 0 ? certData.caPems : undefined,
+      timeout: 30000
+    });
 
     return new https.Agent({
       ...baseTlsOptions,
