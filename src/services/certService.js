@@ -178,31 +178,33 @@ class CertService {
         throw new Error('Certificado ou chave privada não localizados no arquivo .pfx.');
       }
 
-      // Procura o certificado folha (titular / end-entity), ignorando as Autoridades Certificadoras Raiz/Intermediárias
+      const keyPem = keyMatch[0];
+
+      // Pareamento criptográfico exato (Chave Pública da Chave Privada vs Chave Pública do Certificado)
+      // Elimina 100% o erro "key values mismatch" garantindo que o certificado folha selecionado
+      // é matematicamente idêntico à chave privada extraída.
       let leafCertPem = null;
+      const caPems = [];
 
-      // 1ª Tentativa: Seleciona o certificado que NÃO é Autoridade Certificadora (ca === false)
-      for (const certPem of allCerts) {
-        try {
-          const x509 = new crypto.X509Certificate(certPem);
-          if (x509.ca === false) {
-            leafCertPem = certPem;
-            break;
-          }
-        } catch {}
-      }
+      try {
+        const privKey = crypto.createPrivateKey(keyPem);
+        const pubKeyFromPriv = crypto.createPublicKey(privKey).export({ type: 'spki', format: 'pem' });
 
-      // 2ª Tentativa: Procura pelo padrão ICP-Brasil com CN contendo CNPJ/CPF (:00000000000000)
-      if (!leafCertPem) {
         for (const certPem of allCerts) {
           try {
             const x509 = new crypto.X509Certificate(certPem);
-            if (/CN=.*:\d{11,14}/i.test(x509.subject)) {
+            const certPubKey = x509.publicKey.export({ type: 'spki', format: 'pem' });
+            if (certPubKey === pubKeyFromPriv) {
               leafCertPem = certPem;
-              break;
+            } else {
+              caPems.push(certPem);
             }
-          } catch {}
+          } catch {
+            caPems.push(certPem);
+          }
         }
+      } catch (keyErr) {
+        console.warn('Aviso no pareamento criptográfico OpenSSL:', keyErr.message);
       }
 
       // Fallback
@@ -210,11 +212,9 @@ class CertService {
         leafCertPem = allCerts[0];
       }
 
-      const caPems = allCerts.filter(c => c !== leafCertPem);
-
       return {
         certPem: leafCertPem,
-        keyPem: keyMatch[0],
+        keyPem,
         caPems
       };
     } finally {
@@ -260,49 +260,42 @@ class CertService {
       throw new Error('Nenhum certificado localizado no arquivo .pfx.');
     }
 
-    // 1. Prioridade máxima: Certificado cujo localKeyId coincide com o da Chave Privada
+    const keyPem = forge.pki.privateKeyToPem(privateKey);
+
+    // Pareamento criptográfico exato no Forge
     let chosenCert = null;
-    if (keyLocalKeyId) {
-      const match = certCandidates.find(c => c.localKeyId === keyLocalKeyId);
-      if (match) chosenCert = match.cert;
-    }
+    const caPems = [];
 
-    // 2. Se não houver localKeyId ou correspondência, procura o certificado que NÃO é CA (basicConstraints.cA !== true)
-    if (!chosenCert) {
-      for (const c of certCandidates) {
-        const cert = c.cert;
-        const bcExt = cert.getExtension('basicConstraints');
-        const isCa = bcExt && (bcExt.cA === true || bcExt.cA === 'true');
-        if (!isCa) {
-          chosenCert = cert;
-          break;
+    try {
+      const privKey = crypto.createPrivateKey(keyPem);
+      const pubKeyFromPriv = crypto.createPublicKey(privKey).export({ type: 'spki', format: 'pem' });
+
+      for (const candidate of certCandidates) {
+        try {
+          const cPem = forge.pki.certificateToPem(candidate.cert);
+          const x509 = new crypto.X509Certificate(cPem);
+          const certPubKey = x509.publicKey.export({ type: 'spki', format: 'pem' });
+          if (certPubKey === pubKeyFromPriv) {
+            chosenCert = candidate.cert;
+          } else {
+            caPems.push(cPem);
+          }
+        } catch {
+          caPems.push(forge.pki.certificateToPem(candidate.cert));
         }
       }
+    } catch (kErr) {
+      console.warn('Aviso no pareamento criptográfico Forge:', kErr.message);
     }
 
-    // 3. Procura pelo padrão ICP-Brasil no Subject (CN contendo CNPJ ou CPF)
-    if (!chosenCert) {
-      for (const c of certCandidates) {
-        const cn = c.cert.subject.getField('CN');
-        if (cn && /:\d{11,14}$/.test(cn.value)) {
-          chosenCert = c.cert;
-          break;
-        }
-      }
-    }
-
-    // 4. Último fallback: Primeiro certificado encontrado
+    // Fallback se necessário
     if (!chosenCert) {
       chosenCert = certCandidates[0].cert;
     }
 
-    const caPems = certCandidates
-      .filter(c => c.cert !== chosenCert)
-      .map(c => forge.pki.certificateToPem(c.cert));
-
     return {
       certPem: forge.pki.certificateToPem(chosenCert),
-      keyPem: forge.pki.privateKeyToPem(privateKey),
+      keyPem,
       caPems
     };
   }

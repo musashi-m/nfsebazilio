@@ -45,22 +45,11 @@ class AdnService {
       secureOptions: (crypto.constants.SSL_OP_LEGACY_SERVER_CONNECT || 0) | (crypto.constants.SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION || 0)
     };
 
-    // Monta a cadeia completa para o mTLS da Receita Federal:
-    // [Certificado Titular ICP-Brasil, ...Certificados Intermediários das Autoridades Certificadoras]
-    const certChain = [certData.certPem, ...(certData.caPems || [])];
-
     return new https.Agent({
       ...baseTlsOptions,
       key: certData.keyPem,
-      cert: certChain,
+      cert: certData.certPem,
       ca: certData.caPems && certData.caPems.length > 0 ? certData.caPems : undefined,
-      timeout: 30000
-    });
-
-    return new https.Agent({
-      ...baseTlsOptions,
-      pfx: certData.pfxBuffer,
-      passphrase: certData.password || '',
       timeout: 30000
     });
   }
