@@ -1,0 +1,362 @@
+/* Estilos Personalizados do Emissor Nacional NFS-e / ADN */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Scrollbars suaves */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Animações e Transições */
+.fade-in {
+  animation: fadeIn 0.25s ease-in-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Pulso sutil para indicador online */
+.pulse-online {
+  animation: pulseGreen 2s infinite;
+}
+
+@keyframes pulseGreen {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(16, 185, 129, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+/* Estilos de Impressão do DANFSE Nacional */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #danfsePrintArea, #danfsePrintArea * {
+    visibility: visible;
+  }
+  #danfsePrintArea {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: #fff !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* Sidebar Colapsável */
+#appSidebar {
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+#appSidebar.sidebar-collapsed {
+  width: 4.5rem !important; /* 72px */
+}
+#appSidebar.sidebar-collapsed .sidebar-label {
+  display: none !important;
+}
+#appSidebar.sidebar-collapsed .sidebar-header {
+  justify-content: center !important;
+}
+#appSidebar.sidebar-collapsed .sidebar-nav-btn {
+  justify-content: center !important;
+  padding-left: 0.5rem !important;
+  padding-right: 0.5rem !important;
+}
+#appSidebar.sidebar-collapsed .sidebar-nav-btn span {
+  display: none !important;
+}
+
+/* ========================================================
+   TEMA NOTURNO / DARK MODE COMPLETO
+   ======================================================== */
+
+html.dark body {
+  background-color: #0b0f19 !important;
+  color: #e2e8f0 !important;
+}
+
+/* Containers e Cards */
+html.dark .bg-white {
+  background-color: #151c2c !important;
+  border-color: #26334d !important;
+  color: #f1f5f9;
+}
+
+html.dark .bg-slate-50,
+html.dark .bg-slate-50\/80,
+html.dark .bg-slate-50\/90,
+html.dark .bg-slate-100,
+html.dark .bg-slate-100\/70,
+html.dark .bg-slate-100\/90,
+html.dark .bg-slate-100\/95 {
+  background-color: #0f172a !important;
+  border-color: #26334d !important;
+  color: #cbd5e1;
+}
+
+html.dark .bg-slate-200 {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark .bg-slate-200\/60 {
+  background-color: #1e293b !important;
+}
+
+/* Textos */
+html.dark .text-slate-900,
+html.dark .text-slate-950 {
+  color: #f8fafc !important;
+}
+
+html.dark .text-slate-800 {
+  color: #f1f5f9 !important;
+}
+
+html.dark .text-slate-700 {
+  color: #cbd5e1 !important;
+}
+
+html.dark .text-slate-600 {
+  color: #94a3b8 !important;
+}
+
+html.dark .text-slate-500,
+html.dark .text-slate-400 {
+  color: #64748b !important;
+}
+
+/* Bordas e Linhas Divisórias */
+html.dark .border-slate-100,
+html.dark .border-slate-200,
+html.dark .border-slate-200\/80,
+html.dark .border-slate-300 {
+  border-color: #26334d !important;
+}
+
+html.dark .divide-slate-100 > * + *,
+html.dark .divide-slate-200 > * + *,
+html.dark .divide-slate-300 > * + * {
+  border-color: #26334d !important;
+}
+
+/* Inputs, Selects e Textareas */
+html.dark input[type="text"],
+html.dark input[type="date"],
+html.dark input[type="number"],
+html.dark input[type="search"],
+html.dark input[type="password"],
+html.dark select,
+html.dark textarea {
+  background-color: #0f172a !important;
+  border-color: #26334d !important;
+  color: #f8fafc !important;
+}
+
+html.dark input:focus,
+html.dark select:focus,
+html.dark textarea:focus {
+  border-color: #0284c7 !important;
+  box-shadow: 0 0 0 1px #0284c7 !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #64748b !important;
+}
+
+html.dark input[readonly],
+html.dark input:disabled {
+  background-color: #1a2234 !important;
+  border-color: #26334d !important;
+  color: #94a3b8 !important;
+}
+
+/* Sidebar */
+html.dark #appSidebar > div {
+  background-color: #111827 !important;
+  border-color: #1f2937 !important;
+}
+
+html.dark .sidebar-nav-btn.text-slate-600 {
+  color: #94a3b8 !important;
+}
+
+html.dark .sidebar-nav-btn.text-slate-600:hover {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+}
+
+/* Tabela de Histórico no Modo Noturno */
+html.dark #mainHistoryTable thead {
+  background-color: #0c1220 !important;
+  border-color: #26334d !important;
+}
+
+html.dark #mainHistoryTable thead th {
+  background-color: #0c1220 !important;
+  color: #94a3b8 !important;
+  border-color: #26334d !important;
+}
+
+html.dark #mainHistoryTable tbody tr {
+  border-color: #1e293b !important;
+  background-color: #151c2c !important;
+  color: #cbd5e1 !important;
+}
+
+html.dark #mainHistoryTable tbody tr:hover {
+  background-color: #1a2336 !important;
+}
+
+html.dark #mainHistoryTable tbody tr td {
+  border-color: #1e293b !important;
+}
+
+html.dark #mainHistoryTable tfoot,
+html.dark #mainHistoryTable tfoot tr,
+html.dark #mainHistoryTable tfoot td {
+  background-color: #0c1220 !important;
+  border-color: #26334d !important;
+  color: #f8fafc !important;
+}
+
+/* Scrollbar Dupla Superior */
+html.dark #tableScrollTopWrapper {
+  background-color: #0c1220 !important;
+  border-color: #26334d !important;
+}
+
+/* Dropdowns e Autocomplete */
+html.dark #fCTribNacDropdown,
+html.dark #fltTipoServicoDropdown {
+  background-color: #151c2c !important;
+  border-color: #26334d !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.7);
+}
+
+html.dark #fCTribNacDropdown div[data-trib-item]:hover,
+html.dark #fltTipoServicoDropdown div[data-flt-item]:hover {
+  background-color: #1e293b !important;
+}
+
+html.dark #cTribNacSelectedBadge {
+  background-color: rgba(16, 185, 129, 0.1) !important;
+  border-color: rgba(16, 185, 129, 0.25) !important;
+  color: #a7f3d0 !important;
+}
+
+/* Badges e Pílulas */
+html.dark .bg-sky-50 {
+  background-color: rgba(14, 165, 233, 0.15) !important;
+  color: #7dd3fc !important;
+  border-color: rgba(14, 165, 233, 0.3) !important;
+}
+
+html.dark .bg-emerald-50 {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+  color: #6ee7b7 !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
+}
+
+html.dark .bg-rose-50 {
+  background-color: rgba(244, 63, 94, 0.15) !important;
+  color: #fda4af !important;
+  border-color: rgba(244, 63, 94, 0.3) !important;
+}
+
+html.dark .bg-amber-50 {
+  background-color: rgba(245, 158, 11, 0.15) !important;
+  color: #fde68a !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+html.dark .bg-brand-50,
+html.dark .bg-brand-100 {
+  background-color: rgba(2, 132, 199, 0.15) !important;
+  color: #7dd3fc !important;
+}
+
+/* Botões Claros adaptados ao Dark Mode */
+html.dark button.bg-white,
+html.dark button.bg-slate-100 {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+html.dark button.bg-white:hover,
+html.dark button.bg-slate-100:hover {
+  background-color: #334155 !important;
+  color: #ffffff !important;
+}
+
+/* Modais / Diálogos no Modo Noturno */
+html.dark .fixed .bg-white,
+html.dark #repModal,
+html.dark #envModal,
+html.dark #friendlyErrorModalDialog {
+  background-color: #151c2c !important;
+  border-color: #26334d !important;
+  color: #f8fafc !important;
+}
+
+html.dark .fixed .bg-slate-50,
+html.dark .fixed .bg-slate-100 {
+  background-color: #0f172a !important;
+  border-color: #26334d !important;
+}
+
+/* Scrollbars no Modo Noturno */
+html.dark ::-webkit-scrollbar-track {
+  background: #0b0f19;
+}
+html.dark ::-webkit-scrollbar-thumb {
+  background: #26334d;
+}
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #3b4d70;
+}
+
+
+

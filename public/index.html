@@ -1,0 +1,2450 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Emissor Nacional de Notas Fiscais (NFS-e ADN / RFB)</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- JSZip CDN para download de pacotes XML -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="css/styles.css">
+  <script>
+    // Inicialização imediata do tema para evitar clarões na tela (Flash of Unstyled Content)
+    (function() {
+      const savedTheme = localStorage.getItem('emissor_theme');
+      if (savedTheme === 'dark' || (!savedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    })();
+
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#075985',
+              900: '#0c4a6e'
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col font-sans">
+
+  <!-- Topbar Header Principal -->
+  <header class="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-40 shadow-md">
+    <div class="max-w-[1720px] 2xl:max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <!-- Logo e Título -->
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="App.switchTab('dashboard')">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-emerald-500 flex items-center justify-center shadow-inner font-black text-lg text-white">
+          N
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="font-extrabold text-base tracking-tight text-white">EMISSOR NACIONAL</span>
+            <span class="text-[10px] bg-brand-700/60 text-brand-200 px-1.5 py-0.5 rounded font-mono font-semibold">ADN • RFB</span>
+          </div>
+          <p class="text-[11px] text-slate-400">NFS-e Padrão Nacional • Serpro & Conexão Direta</p>
+        </div>
+      </div>
+
+      <!-- Controles Centrais e Status (Limpo e sem poluição) -->
+      <div class="flex items-center space-x-3">
+        
+        <!-- Botão PROCURAÇÃO / REPRESENTAÇÃO -->
+        <button onclick="App.openRepresentationModal()" class="flex items-center space-x-2.5 bg-slate-800 hover:bg-slate-700/80 border border-slate-700 px-3.5 py-1.5 rounded-xl transition-all text-left group">
+          <div class="w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center group-hover:bg-emerald-500/20">
+            <i data-lucide="users" class="w-3.5 h-3.5"></i>
+          </div>
+          <div class="text-xs">
+            <span class="text-[9px] text-slate-400 font-bold uppercase tracking-wider block leading-tight">Representação:</span>
+            <span id="topRepresentationText" class="text-white font-semibold block max-w-[220px] truncate text-[11px]">Selecionar Empresa...</span>
+          </div>
+          <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
+        </button>
+
+        <!-- Badge do Certificado Ativo -->
+        <div id="topCertInfo">
+          <!-- Populado dinamicamente -->
+        </div>
+
+        <!-- Botão Alternador de Tema Noturno / Claro -->
+        <button id="btnToggleTheme" onclick="App.toggleTheme()" class="p-2 bg-slate-800 hover:bg-slate-700/80 border border-slate-700 rounded-xl text-slate-300 hover:text-amber-400 transition-colors shadow-sm flex items-center justify-center shrink-0" title="Alternar entre Tema Claro e Tema Noturno">
+          <i id="themeToggleIcon" data-lucide="moon" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Layout Principal: Sidebar de Navegação + Conteúdo -->
+  <div class="flex-1 max-w-[1720px] 2xl:max-w-[1920px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex gap-6">
+    
+    <!-- Sidebar / Menu Lateral Colapsável -->
+    <aside id="appSidebar" class="w-60 shrink-0 hidden md:block transition-all duration-300">
+      <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-3 sticky top-24 space-y-1">
+        
+        <!-- Topo da Sidebar com Botão de Colapso/Expansão -->
+        <div class="flex items-center justify-between pb-2 mb-1 border-b border-slate-100 sidebar-header">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 sidebar-label">Navegação</span>
+          <button id="btnToggleSidebar" type="button" onclick="App.toggleSidebar()" class="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors" title="Recolher menu lateral">
+            <i data-lucide="panel-left-close" class="w-4 h-4 sidebar-toggle-icon"></i>
+          </button>
+        </div>
+
+        <button data-nav-tab="dashboard" class="sidebar-nav-btn w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-white bg-slate-800 shadow-sm transition-all text-left" title="Visão Geral">
+          <i data-lucide="layout-dashboard" class="w-4 h-4 shrink-0"></i>
+          <span class="sidebar-label">Visão Geral</span>
+        </button>
+
+        <button data-nav-tab="emissao" class="sidebar-nav-btn w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all text-left" title="Nova Emissão (DPS)">
+          <i data-lucide="file-plus-2" class="w-4 h-4 text-emerald-600 shrink-0"></i>
+          <span class="sidebar-label">Nova Emissão (DPS)</span>
+        </button>
+
+        <button data-nav-tab="historico" class="sidebar-nav-btn w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all text-left" title="Histórico ADN">
+          <i data-lucide="database" class="w-4 h-4 text-brand-600 shrink-0"></i>
+          <span class="sidebar-label">Histórico ADN</span>
+        </button>
+
+        <button data-nav-tab="certificado" class="sidebar-nav-btn w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all text-left" title="Certificado Digital">
+          <i data-lucide="key-round" class="w-4 h-4 text-amber-600 shrink-0"></i>
+          <span class="sidebar-label">Certificado Digital</span>
+        </button>
+
+        <button data-nav-tab="conexoes" class="sidebar-nav-btn w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all text-left" title="Ambiente de Emissão & Conexões">
+          <i data-lucide="sliders" class="w-4 h-4 text-indigo-600 shrink-0"></i>
+          <span class="sidebar-label">Ambiente & Conexões</span>
+        </button>
+
+        <div class="pt-2 border-t border-slate-100">
+          <button data-nav-tab="ajuda" class="sidebar-nav-btn w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all text-left" title="Dicionário de Erros">
+            <i data-lucide="help-circle" class="w-4 h-4 text-rose-500 shrink-0"></i>
+            <span class="sidebar-label">Dicionário de Erros</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Área Principal de Conteúdo -->
+    <main class="flex-1 min-w-0">
+
+      <!-- ========================================== -->
+      <!-- PAINEL 1: VISÃO GERAL / DASHBOARD -->
+      <!-- ========================================== -->
+      <section id="panel-dashboard" class="tab-content-panel space-y-6">
+        
+        <!-- Banner de Representação Ativa -->
+        <div id="dashRepresentationBanner" class="bg-gradient-to-r from-slate-900 to-brand-900 rounded-2xl p-6 text-white shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div class="space-y-1 max-w-2xl">
+            <div class="flex items-center space-x-2">
+              <span class="px-2 py-0.5 rounded bg-emerald-500 text-white font-bold text-[10px] uppercase">Representação Ativa</span>
+              <h3 id="dashBannerTitle" class="text-base font-bold text-white">Carregando dados da empresa representada...</h3>
+            </div>
+            <p id="dashBannerSub" class="text-xs text-slate-300 leading-relaxed">
+              O emissor transmite as notas no Ambiente de Dados Nacional utilizando a procuração eletrônica do certificado digital ativo.
+            </p>
+          </div>
+          <div class="flex items-center space-x-2 shrink-0">
+            <button onclick="App.openRepresentationModal()" class="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-xl transition-colors flex items-center space-x-1.5 border border-white/20">
+              <i data-lucide="repeat" class="w-4 h-4"></i>
+              <span>Trocar Empresa</span>
+            </button>
+            <button onclick="App.switchTab('emissao')" class="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl shadow transition-colors flex items-center space-x-1.5">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i>
+              <span>Emitir NFS-e</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Cards de Indicadores -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <!-- Card 1: Notas Emitidas (Prestadas) -->
+          <div class="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm">
+            <div class="flex items-center justify-between text-slate-500 mb-2">
+              <span class="text-xs font-semibold uppercase tracking-wider">Emitidas (Prestador)</span>
+              <div class="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
+              </div>
+            </div>
+            <div id="dashTotalEmitidas" class="text-2xl font-extrabold text-slate-900">0</div>
+            <span id="dashSubEmitidas" class="text-[11px] text-slate-400 mt-1 block">Faturamento da representada</span>
+            <!-- Hidden inputs para compatibilidade de ids legados -->
+            <span id="dashTotalNotas" class="hidden">0</span>
+            <span id="dashTotalAutorizadas" class="hidden">0</span>
+          </div>
+
+          <!-- Card 2: Total Faturado -->
+          <div class="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm">
+            <div class="flex items-center justify-between text-slate-500 mb-2">
+              <span class="text-xs font-semibold uppercase tracking-wider">Total Faturado</span>
+              <div class="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                <i data-lucide="dollar-sign" class="w-4 h-4"></i>
+              </div>
+            </div>
+            <div id="dashTotalFaturado" class="text-2xl font-extrabold text-emerald-700">R$ 0,00</div>
+            <span class="text-[11px] text-emerald-600 mt-1 block font-medium">Notas emitidas autorizadas</span>
+          </div>
+
+          <!-- Card 3: Notas Tomadas (Recebidas) -->
+          <div class="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm">
+            <div class="flex items-center justify-between text-slate-500 mb-2">
+              <span class="text-xs font-semibold uppercase tracking-wider">Tomadas (Recebidas)</span>
+              <div class="p-2 rounded-xl bg-blue-50 text-blue-600">
+                <i data-lucide="arrow-down-left" class="w-4 h-4"></i>
+              </div>
+            </div>
+            <div id="dashTotalTomadas" class="text-2xl font-extrabold text-blue-700">0</div>
+            <span id="dashTotalTomadasValor" class="text-[11px] text-blue-600 mt-1 block font-medium">Despesas: R$ 0,00</span>
+          </div>
+
+          <!-- Card 4: Canceladas -->
+          <div class="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm">
+            <div class="flex items-center justify-between text-slate-500 mb-2">
+              <span class="text-xs font-semibold uppercase tracking-wider">Canceladas</span>
+              <div class="p-2 rounded-xl bg-rose-50 text-rose-600">
+                <i data-lucide="x-circle" class="w-4 h-4"></i>
+              </div>
+            </div>
+            <div id="dashTotalCanceladas" class="text-2xl font-extrabold text-rose-600">0</div>
+            <span class="text-[11px] text-slate-400 mt-1 block">Cancelamentos homologados</span>
+          </div>
+        </div>
+
+        <!-- Últimas Notas do Acervo ADN -->
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div class="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center gap-3">
+              <h3 class="font-bold text-sm text-slate-900" id="dashTableTitle">Últimas NFS-e (ADN)</h3>
+              <!-- Filtro de Abas Rápidas no Dashboard -->
+              <div class="inline-flex items-center bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+                <button type="button" onclick="App.setDashPapelFilter('EMITIDAS')" id="btnDashPapelEmitidas" class="px-3 py-1 rounded-lg bg-white shadow-sm text-emerald-800 transition-all font-bold">
+                  Emitidas (Prestadas)
+                </button>
+                <button type="button" onclick="App.setDashPapelFilter('RECEBIDAS')" id="btnDashPapelRecebidas" class="px-3 py-1 rounded-lg text-slate-600 hover:text-slate-900 transition-all">
+                  Recebidas (Tomadas)
+                </button>
+                <button type="button" onclick="App.setDashPapelFilter('TODAS')" id="btnDashPapelTodas" class="px-3 py-1 rounded-lg text-slate-600 hover:text-slate-900 transition-all">
+                  Todas
+                </button>
+              </div>
+            </div>
+            <button onclick="App.switchTab('historico')" class="text-xs font-semibold text-brand-600 hover:text-brand-700 flex items-center space-x-1">
+              <span>Ver Histórico Completo</span>
+              <span>→</span>
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left">
+              <thead class="bg-slate-50 text-[11px] font-bold uppercase text-slate-500 border-b border-slate-100">
+                <tr>
+                  <th class="py-3 px-4">Nº NFS-e</th>
+                  <th class="py-3 px-4">Papel</th>
+                  <th class="py-3 px-4">Data</th>
+                  <th class="py-3 px-4">Contraparte</th>
+                  <th class="py-3 px-4">Valor Bruto</th>
+                  <th class="py-3 px-4">Status</th>
+                </tr>
+              </thead>
+              <tbody id="dashRecentTableBody">
+                <!-- Populado dinamicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- PAINEL 2: EMISSÃO COMPLETA DE NFS-E NACIONAL -->
+      <!-- ========================================== -->
+      <section id="panel-emissao" class="tab-content-panel hidden space-y-6">
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-2">
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold uppercase">Padrão Nacional CGNFS-e</span>
+                <h2 class="text-lg font-bold text-slate-900">Emissão Completa de NFS-e Nacional (DPS v1.00)</h2>
+              </div>
+              <p class="text-xs text-slate-500 mt-0.5">Preenchimento oficial com todas as seções cadastrais e tributárias da Receita Federal</p>
+            </div>
+            <div class="flex items-center space-x-2">
+              <button type="button" onclick="App.previewXmlDps()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-colors flex items-center space-x-1.5 border border-slate-200">
+                <i data-lucide="code" class="w-3.5 h-3.5"></i>
+                <span>Ver XML da DPS</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- BLOCO: CARREGAR DADOS DE UMA NOTA ANTERIOR -->
+          <div class="bg-slate-50/80 p-5 rounded-2xl border border-slate-200/90 space-y-4 shadow-sm">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200/70 pb-3 gap-2">
+              <div class="flex items-center space-x-2.5">
+                <div class="w-8 h-8 rounded-xl bg-emerald-600/10 text-emerald-600 flex items-center justify-center font-bold">
+                  <i data-lucide="copy" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm font-bold text-slate-800">Carregar dados de uma nota anterior</h3>
+                  <p class="text-[11px] text-slate-500">Reaproveite as informações de uma NFS-e já emitida para acelerar o preenchimento</p>
+                </div>
+              </div>
+              <div class="flex items-center space-x-2">
+                <span class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200/80 flex items-center space-x-1.5" title="Acervo vinculado à empresa representada ativa">
+                  <i data-lucide="building-2" class="w-3.5 h-3.5 text-emerald-600"></i>
+                  <span id="loadPreviousNoteActiveCompanyName">Selecionar Representada...</span>
+                </span>
+              </div>
+            </div>
+
+            <!-- 3 Colunas de Busca/Carregamento -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+              
+              <!-- Coluna 1: Última NFS-e emitida -->
+              <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-3">
+                <div>
+                  <h4 class="text-xs font-bold text-slate-800 mb-1 flex items-center space-x-1.5">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500"></i>
+                    <span>Última NFS-e emitida</span>
+                  </h4>
+                  <p class="text-[11px] text-slate-500 leading-relaxed">Carrega todos os dados da nota mais recente emitida por este CNPJ.</p>
+                </div>
+                <div>
+                  <button type="button" onclick="App.carregarUltimaNfseEmitida()" id="btnCarregarUltimaNfse" class="w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 font-semibold text-xs rounded-xl border border-slate-300 shadow-sm transition-all flex items-center justify-center space-x-1.5 active:scale-95">
+                    <i data-lucide="history" class="w-3.5 h-3.5 text-emerald-600"></i>
+                    <span>Carregar</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Coluna 2: Por número da NFS-e -->
+              <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-3">
+                <div>
+                  <h4 class="text-xs font-bold text-slate-800 mb-1 flex items-center space-x-1.5">
+                    <i data-lucide="hash" class="w-3.5 h-3.5 text-brand-500"></i>
+                    <span>Por número da NFS-e</span>
+                  </h4>
+                  <div class="grid grid-cols-3 gap-2 pt-1">
+                    <div class="col-span-1">
+                      <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Ano</label>
+                      <select id="loadPrevNfseAno" class="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-xs font-bold bg-white text-slate-800 outline-none focus:ring-1 focus:ring-emerald-500">
+                        <option value="2026" selected>2026</option>
+                        <option value="2025">2025</option>
+                        <option value="2024">2024</option>
+                        <option value="2023">2023</option>
+                        <option value="">Todos</option>
+                      </select>
+                    </div>
+                    <div class="col-span-2">
+                      <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Número</label>
+                      <input type="text" id="loadPrevNfseNumero" placeholder="Número completo (13/15 dígitos)" onkeydown="if(event.key==='Enter'){event.preventDefault();App.carregarNfsePorNumero();}" class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-mono bg-white text-slate-800 outline-none focus:ring-1 focus:ring-emerald-500">
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <button type="button" onclick="App.carregarNfsePorNumero()" id="btnCarregarPorNumero" class="w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 font-semibold text-xs rounded-xl border border-slate-300 shadow-sm transition-all flex items-center justify-center space-x-1.5 active:scale-95">
+                    <i data-lucide="file-search" class="w-3.5 h-3.5 text-brand-600"></i>
+                    <span>Carregar</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Coluna 3: Por documento do tomador -->
+              <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-3">
+                <div>
+                  <h4 class="text-xs font-bold text-slate-800 mb-1 flex items-center space-x-1.5">
+                    <i data-lucide="user" class="w-3.5 h-3.5 text-blue-500"></i>
+                    <span>Por documento do tomador</span>
+                  </h4>
+                  <div class="pt-1">
+                    <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">CPF ou CNPJ do Tomador</label>
+                    <input type="text" id="loadPrevTomadorDoc" placeholder="CPF ou CNPJ do Tomador" onkeydown="if(event.key==='Enter'){event.preventDefault();App.carregarNfsePorTomador();}" class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-mono bg-white text-slate-800 outline-none focus:ring-1 focus:ring-emerald-500">
+                  </div>
+                </div>
+                <div>
+                  <button type="button" onclick="App.carregarNfsePorTomador()" id="btnCarregarPorTomador" class="w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 font-semibold text-xs rounded-xl border border-slate-300 shadow-sm transition-all flex items-center justify-center space-x-1.5 active:scale-95">
+                    <i data-lucide="user-check" class="w-3.5 h-3.5 text-blue-600"></i>
+                    <span>Carregar</span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Banner Informativo de Confirmação quando uma nota for carregada -->
+            <div id="loadPrevNoteAlert" class="hidden p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-xs text-emerald-900 flex items-center justify-between">
+              <div class="flex items-center space-x-2">
+                <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 shrink-0"></i>
+                <span id="loadPrevNoteAlertMsg" class="font-medium"></span>
+              </div>
+              <button type="button" onclick="document.getElementById('loadPrevNoteAlert').classList.add('hidden')" class="text-emerald-700 hover:text-emerald-950 p-1">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- BLOCO: MODELOS PRONTOS DE NOTA FISCAL (TEMPLATES) -->
+          <div class="bg-slate-50/80 p-5 rounded-2xl border border-slate-200/90 space-y-4 shadow-sm">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200/70 pb-3 gap-2">
+              <div class="flex items-center space-x-2.5">
+                <div class="w-8 h-8 rounded-xl bg-brand-600/10 text-brand-600 flex items-center justify-center font-bold">
+                  <i data-lucide="layout-template" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm font-bold text-slate-800">Modelos Prontos de Emissão (Templates)</h3>
+                  <p class="text-[11px] text-slate-500">Configure modelos frequentes de serviço e tributação para alterar apenas o tomador e emitir rapidamente</p>
+                </div>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <button type="button" onclick="App.openManageTemplatesModal()" class="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl border border-slate-300 shadow-sm transition-all flex items-center space-x-1.5 active:scale-95">
+                  <i data-lucide="settings-2" class="w-3.5 h-3.5 text-slate-500"></i>
+                  <span>Gerenciar Modelos</span>
+                </button>
+                <button type="button" onclick="App.openSaveCurrentAsTemplateModal()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center space-x-1.5 active:scale-95">
+                  <i data-lucide="bookmark-plus" class="w-3.5 h-3.5"></i>
+                  <span>Salvar Atual como Modelo</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1">
+              <div class="flex-1">
+                <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">Modelo de Serviço e Tributação</label>
+                <select id="selectEmissionTemplate" onchange="App.handleTemplateSelectChange(this.value)" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold bg-white text-slate-800 outline-none focus:ring-2 focus:ring-brand-500">
+                  <option value="">Nenhum modelo selecionado (Preenchimento manual)</option>
+                  <!-- Populado dinamicamente -->
+                </select>
+              </div>
+              <div class="sm:pt-5">
+                <button type="button" onclick="App.aplicarModeloSelecionado()" id="btnAplicarModelo" class="w-full sm:w-auto px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center space-x-1.5 active:scale-95">
+                  <i data-lucide="wand-2" class="w-4 h-4"></i>
+                  <span>Aplicar Modelo no Formulário</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Banner Informativo de Confirmação quando um modelo for aplicado -->
+            <div id="templateAlert" class="hidden p-3 rounded-xl bg-brand-50 border border-brand-200 text-xs text-brand-900 flex items-center justify-between">
+              <div class="flex items-center space-x-2">
+                <i data-lucide="check-circle" class="w-4 h-4 text-brand-600 shrink-0"></i>
+                <span id="templateAlertMsg" class="font-medium"></span>
+              </div>
+              <button type="button" onclick="document.getElementById('templateAlert').classList.add('hidden')" class="text-brand-700 hover:text-brand-950 p-1">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- STEPPER INDICATOR DE ETAPAS DA EMISSÃO -->
+          <div class="bg-slate-50/90 p-3 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <!-- Etapa 1 -->
+              <button type="button" onclick="App.goToEmissionStep(1)" id="stepTab-1" class="emission-step-btn flex items-center space-x-2.5 p-2.5 rounded-xl border text-left transition-all bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 text-emerald-950 dark:text-emerald-100 font-bold shadow-sm">
+                <div class="step-num-circle w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-black text-xs shrink-0">1</div>
+                <div class="min-w-0">
+                  <div class="text-[9px] uppercase tracking-wider text-emerald-700 dark:text-emerald-300 font-bold">1ª Etapa</div>
+                  <div class="text-xs font-bold truncate">Pessoas</div>
+                </div>
+              </button>
+
+              <!-- Etapa 2 -->
+              <button type="button" onclick="App.goToEmissionStep(2)" id="stepTab-2" class="emission-step-btn flex items-center space-x-2.5 p-2.5 rounded-xl border text-left transition-all bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-medium hover:bg-slate-100">
+                <div class="step-num-circle w-7 h-7 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-black text-xs shrink-0">2</div>
+                <div class="min-w-0">
+                  <div class="text-[9px] uppercase tracking-wider text-slate-400 font-bold">2ª Etapa</div>
+                  <div class="text-xs font-bold truncate">Serviço</div>
+                </div>
+              </button>
+
+              <!-- Etapa 3 -->
+              <button type="button" onclick="App.goToEmissionStep(3)" id="stepTab-3" class="emission-step-btn flex items-center space-x-2.5 p-2.5 rounded-xl border text-left transition-all bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-medium hover:bg-slate-100">
+                <div class="step-num-circle w-7 h-7 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-black text-xs shrink-0">3</div>
+                <div class="min-w-0">
+                  <div class="text-[9px] uppercase tracking-wider text-slate-400 font-bold">3ª Etapa</div>
+                  <div class="text-xs font-bold truncate">Valores</div>
+                </div>
+              </button>
+
+              <!-- Etapa 4 -->
+              <button type="button" onclick="App.goToEmissionStep(4)" id="stepTab-4" class="emission-step-btn flex items-center space-x-2.5 p-2.5 rounded-xl border text-left transition-all bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-medium hover:bg-slate-100">
+                <div class="step-num-circle w-7 h-7 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-black text-xs shrink-0">4</div>
+                <div class="min-w-0">
+                  <div class="text-[9px] uppercase tracking-wider text-slate-400 font-bold">4ª Parte</div>
+                  <div class="text-xs font-bold truncate">Revisão</div>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <!-- CONTAINER ETAPA 1: PESSOAS -->
+          <div id="emissionStepContainer-1" class="space-y-6">
+
+            <!-- BLOCO 0: CONFIGURAÇÕES INICIAIS DA NFS-E -->
+          <div class="bg-slate-50/70 p-5 rounded-2xl border border-slate-200/90 space-y-4">
+            <!-- IBS/CBS (Reforma Tributária) -->
+            <div class="space-y-1">
+              <label class="block text-xs font-bold text-slate-800">Preencher as informações IBS/CBS? <span class="text-rose-500">*</span></label>
+              <div class="flex items-center space-x-6 pt-1">
+                <label class="flex items-center space-x-2 cursor-pointer text-xs">
+                  <input type="radio" name="fIbsCbs" value="sim" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                  <span class="text-slate-700 font-medium">Sim</span>
+                </label>
+                <label class="flex items-center space-x-2 cursor-pointer text-xs">
+                  <input type="radio" name="fIbsCbs" value="nao" checked class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                  <span class="text-slate-700 font-semibold">Não</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Data de Competência e Série/Número da DPS -->
+            <div class="flex flex-col sm:flex-row sm:items-end gap-5 pt-1 border-t border-slate-200/60">
+              <div class="w-full sm:w-64">
+                <label class="block text-xs font-bold text-slate-800 mb-1 flex items-center space-x-1.5">
+                  <span>Data de Competência</span>
+                  <span class="text-rose-500">*</span>
+                  <i data-lucide="help-circle" class="w-3.5 h-3.5 text-slate-400" title="Data em que o serviço foi efetivamente prestado"></i>
+                </label>
+                <input type="date" id="fDataCompetencia" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500 outline-none bg-white shadow-sm">
+              </div>
+              <div class="pb-2">
+                <label class="flex items-center space-x-2 cursor-pointer text-xs font-medium text-slate-700">
+                  <input type="checkbox" id="chkInformarSerieNum" onchange="App.toggleSerieNumDps()" class="w-4 h-4 text-emerald-600 rounded">
+                  <span>Informar série e número da DPS</span>
+                </label>
+              </div>
+            </div>
+
+            <div id="boxSerieNumDps" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-white border border-slate-200 rounded-xl shadow-inner">
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Série da DPS * (Faixa 00001 a 49999)</label>
+                <input type="text" id="fSerieDps" value="00001" maxlength="5" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono font-bold focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Número da DPS</label>
+                <input type="number" id="fNumeroDps" placeholder="Automático (Incremento sequencial)" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+              </div>
+            </div>
+          </div>
+
+          <!-- SEÇÃO 1: EMITENTE DA NFS-E -->
+          <div class="space-y-4 pt-2">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center space-x-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                <span>EMITENTE DA NFS-E</span>
+              </h3>
+              <button type="button" onclick="App.openRepresentationModal()" class="text-xs text-brand-600 hover:text-brand-700 font-semibold flex items-center space-x-1">
+                <i data-lucide="repeat" class="w-3.5 h-3.5"></i>
+                <span>Trocar Empresa Representada</span>
+              </button>
+            </div>
+
+            <!-- Perfil de Emissão -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1 flex items-center space-x-1.5">
+                <span>Você irá emitir esta NFS-e como?</span>
+                <span class="text-rose-500">*</span>
+                <i data-lucide="help-circle" class="w-3.5 h-3.5 text-slate-400"></i>
+              </label>
+              <div class="flex flex-wrap items-center gap-6 pt-1">
+                <label class="flex items-center space-x-2 cursor-pointer text-xs">
+                  <input type="radio" name="fTpEmit" value="1" checked class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                  <span class="text-slate-800 font-semibold">Prestador/Fornecedor</span>
+                </label>
+                <label class="flex items-center space-x-2 cursor-pointer text-xs">
+                  <input type="radio" name="fTpEmit" value="2" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                  <span class="text-slate-700">Tomador/Adquirente</span>
+                </label>
+                <label class="flex items-center space-x-2 cursor-pointer text-xs">
+                  <input type="radio" name="fTpEmit" value="3" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                  <span class="text-slate-700">Intermediário</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Município e Indicador Municipal -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Município <span class="text-rose-500">*</span></label>
+                <select id="fMunicipioPrestadorSelect" onchange="App.handleMunicipioPrestadorChange(this.value)" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+                  <option value="2800308" selected>Aracaju/SE</option>
+                  <option value="2803500">Lagarto/SE</option>
+                  <option value="2804805">Nossa Senhora do Socorro/SE</option>
+                  <option value="3550308">São Paulo/SP</option>
+                  <option value="3304557">Rio de Janeiro/RJ</option>
+                  <option value="3106200">Belo Horizonte/MG</option>
+                  <option value="2927408">Salvador/BA</option>
+                  <option value="5300108">Brasília/DF</option>
+                </select>
+                <input type="hidden" id="fMunicipioIbge" value="2800308">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Indicador Municipal <span class="text-rose-500">*</span></label>
+                <input type="text" id="fPrestadorIm" value="842161" placeholder="Inscrição Municipal ou Indicador" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+              </div>
+            </div>
+
+            <!-- CNPJ e Razão Social -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">CNPJ</label>
+                <div class="flex space-x-2">
+                  <input type="text" id="fPrestadorCnpj" readonly placeholder="00.000.000/0000-00" class="flex-1 px-3 py-2 border border-slate-200 bg-slate-100 rounded-xl text-xs font-mono font-bold text-slate-800 outline-none cursor-not-allowed">
+                  <button type="button" onclick="App.openRepresentationModal()" class="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-xl" title="Trocar ou consultar representação">
+                    <i data-lucide="repeat" class="w-3.5 h-3.5"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="md:col-span-2">
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Razão Social</label>
+                <input type="text" id="fPrestadorRazaoSocial" readonly placeholder="Nome empresarial" class="w-full px-3 py-2 border border-slate-200 bg-slate-100 rounded-xl text-xs font-bold text-slate-800 outline-none cursor-not-allowed">
+              </div>
+            </div>
+
+            <!-- Simples Nacional & Regime de Apuração -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center space-x-1.5">
+                  <span>Opção no Simples Nacional</span>
+                  <span class="text-rose-500">*</span>
+                  <i data-lucide="help-circle" class="w-3.5 h-3.5 text-slate-400"></i>
+                </label>
+                <select id="fOpSimpNac" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+                  <option value="3" selected>3 - Optante - Microempresa ou Empresa de Pequeno Porte (ME/EPP)</option>
+                  <option value="2">2 - Optante - Microempreendedor Individual (MEI)</option>
+                  <option value="1">1 - Não Optante (Regime Geral / Lucro Presumido / Lucro Real)</option>
+                  <option value="4">4 - Optante - Enquadramento Pendente</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center space-x-1.5">
+                  <span>Regime de Apuração dos Tributos no Simples Nacional</span>
+                  <span class="text-rose-500">*</span>
+                </label>
+                <select id="fRegApTribSN" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+                  <option value="1" selected>Regime de apuração dos tributos federais e municipal pelo Simples Nacional</option>
+                  <option value="2">Regime de apuração dos tributos federais pelo Simples Nacional e o ISSQN pela NFS-e conforme respectiva legislação municipal do tributo</option>
+                  <option value="3">Regime de apuração dos tributos federais e municipal pela NFS-e conforme respectivas legislações federal e municipal de cada tributo</option>
+                </select>
+                <input type="hidden" id="fRegEspTrib" value="0">
+              </div>
+            </div>
+
+            <!-- Endereço do Prestador -->
+            <div class="grid grid-cols-1 sm:grid-cols-5 gap-3 pt-1">
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">CEP</label>
+                <div class="flex space-x-1.5">
+                  <input type="text" id="fPrestadorCep" value="49.050-710" placeholder="00000-000" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono outline-none bg-white">
+                  <button type="button" onclick="App.buscarCepGenerico('fPrestadorCep', 'fPrestadorLogradouro', 'fPrestadorBairro')" class="px-2.5 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 rounded-lg text-xs" title="Buscar CEP">
+                    <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="sm:col-span-2">
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Logradouro</label>
+                <input type="text" id="fPrestadorLogradouro" value="RUA SAO JUDAS TADEU" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs outline-none bg-white">
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Número</label>
+                <input type="text" id="fPrestadorNumero" value="378" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs outline-none bg-white">
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Bairro</label>
+                <input type="text" id="fPrestadorBairro" value="PEREIRA LOBO" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs outline-none bg-white">
+              </div>
+            </div>
+          </div>
+
+          <!-- SEÇÃO 2: COMPRAS GOVERNAMENTAIS -->
+          <div class="space-y-3 pt-4 border-t border-slate-100">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+              <span>COMPRAS GOVERNAMENTAIS</span>
+            </h3>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1 flex items-center space-x-1.5">
+                <span>A operação se trata de uma compra governamental?</span>
+                <span class="text-rose-500">*</span>
+                <i data-lucide="help-circle" class="w-3.5 h-3.5 text-slate-400"></i>
+              </label>
+              <div class="flex items-center space-x-6 pt-1">
+                <label class="flex items-center space-x-2 cursor-pointer text-xs">
+                  <input type="radio" name="fComprasGov" value="sim" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                  <span class="text-slate-700">Sim</span>
+                </label>
+                <label class="flex items-center space-x-2 cursor-pointer text-xs">
+                  <input type="radio" name="fComprasGov" value="nao" checked class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                  <span class="text-slate-700 font-semibold">Não</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- SEÇÃO 3: TOMADOR/ADQUIRENTE DO SERVIÇO -->
+          <div class="space-y-4 pt-4 border-t border-slate-100">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+              <span>TOMADOR/ADQUIRENTE DO SERVIÇO</span>
+            </h3>
+
+            <!-- Localização do Domicílio -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1 flex items-center space-x-1.5">
+                <span>Onde está localizado o estabelecimento/domicílio?</span>
+                <span class="text-rose-500">*</span>
+              </label>
+              <div class="flex flex-wrap items-center gap-6 pt-1">
+                <label class="flex items-center space-x-2 cursor-pointer text-xs">
+                  <input type="radio" name="fTomadorLocalizacao" value="brasil" checked onchange="App.handleTomadorLocalizacaoChange('brasil')" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                  <span class="text-slate-800 font-semibold">Brasil</span>
+                </label>
+                <label class="flex items-center space-x-2 cursor-pointer text-xs">
+                  <input type="radio" name="fTomadorLocalizacao" value="exterior" onchange="App.handleTomadorLocalizacaoChange('exterior')" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                  <span class="text-slate-700">Exterior</span>
+                </label>
+                <label class="flex items-center space-x-2 cursor-pointer text-xs">
+                  <input type="radio" name="fTomadorLocalizacao" value="nao_informado" onchange="App.handleTomadorLocalizacaoChange('nao_informado')" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                  <span class="text-slate-700">Tomador/Adquirente não informado</span>
+                </label>
+              </div>
+            </div>
+
+            <div id="boxTomadorConteudo" class="space-y-4">
+              <!-- CPF/CNPJ e Indicador Municipal -->
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <label id="lblTomadorDoc" class="block text-xs font-semibold text-slate-700">CPF/CNPJ do Tomador <span class="text-rose-500">*</span></label>
+                    <span id="badgeCnpjOnline" class="hidden text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                      ✓ Histórico
+                    </span>
+                  </div>
+                  <div class="flex space-x-1.5">
+                    <input type="text" id="fTomadorDoc" placeholder="000.000.000-00 ou 00.000.000/0000-00" onkeydown="if(event.key==='Enter'){event.preventDefault();App.buscarTomador();}" onblur="App.handleTomadorDocBlur()" class="flex-1 px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-emerald-500 outline-none">
+                    <button type="button" id="btnBuscarTomadorCnpj" onclick="App.buscarTomador()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-colors shadow-sm shrink-0" title="Localizar dados cadastrais do tomador no acervo do prestador ou na Receita Federal">
+                      <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                      <span class="text-[11px] hidden sm:inline">Buscar</span>
+                    </button>
+                  </div>
+                </div>
+                <div class="md:col-span-2">
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Indicador Municipal</label>
+                  <input type="text" id="fTomadorIm" placeholder="Inscrição Municipal (opcional)" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-emerald-500 outline-none">
+                </div>
+              </div>
+
+              <!-- Nome/Razão Social -->
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Nome/Razão Social <span class="text-rose-500">*</span></label>
+                <input type="text" id="fTomadorNome" placeholder="Nome completo (Pessoa Física) ou Razão Social (Pessoa Jurídica)" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500 outline-none">
+              </div>
+
+              <!-- Telefone e E-mail -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Telefone</label>
+                  <input type="text" id="fTomadorTelefone" placeholder="(00) 00000-0000" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-emerald-500 outline-none">
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">E-mail</label>
+                  <input type="email" id="fTomadorEmail" placeholder="cliente@email.com" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none">
+                </div>
+              </div>
+
+              <!-- Checkbox Informar Endereço -->
+              <div class="pt-1">
+                <label class="flex items-center space-x-2 cursor-pointer text-xs font-medium text-slate-700">
+                  <input type="checkbox" id="chkInformarEnderecoTomador" checked onchange="App.toggleEnderecoTomador()" class="w-4 h-4 text-emerald-600 rounded">
+                  <span>Informar endereço</span>
+                </label>
+              </div>
+
+              <!-- Bloco de Endereço do Tomador -->
+              <div id="boxEnderecoTomador" class="bg-slate-50/80 p-4 rounded-xl border border-slate-200 space-y-3">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label class="block text-[11px] text-slate-600 mb-1 font-semibold">CEP <span class="text-rose-500">*</span></label>
+                    <div class="flex space-x-1.5">
+                      <input type="text" id="fTomadorCep" placeholder="00000-000" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono outline-none bg-white">
+                      <button type="button" onclick="App.buscarCepGenerico('fTomadorCep', 'fTomadorLogradouro', 'fTomadorBairro', 'fTomadorMunicipio', 'fTomadorUf')" class="px-2.5 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 rounded-lg text-xs" title="Buscar CEP">
+                        <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="sm:col-span-2">
+                    <label class="block text-[11px] text-slate-600 mb-1 font-semibold">Município</label>
+                    <input type="text" id="fTomadorMunicipio" placeholder="Município / UF" class="w-full px-3 py-2 border border-slate-200 bg-slate-100 rounded-lg text-xs font-medium text-slate-700 outline-none">
+                    <input type="hidden" id="fTomadorUf" value="SE">
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-[11px] text-slate-600 mb-1 font-semibold">Bairro <span class="text-rose-500">*</span></label>
+                    <input type="text" id="fTomadorBairro" placeholder="Bairro" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs outline-none bg-white">
+                  </div>
+                  <div>
+                    <label class="block text-[11px] text-slate-600 mb-1 font-semibold">Logradouro <span class="text-rose-500">*</span></label>
+                    <input type="text" id="fTomadorLogradouro" placeholder="Avenida / Rua / Praça" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs outline-none bg-white">
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label class="block text-[11px] text-slate-600 mb-1 font-semibold">Número <span class="text-rose-500">*</span></label>
+                    <input type="text" id="fTomadorNumero" placeholder="Nº ou S/N" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs outline-none bg-white">
+                  </div>
+                  <div class="sm:col-span-2">
+                    <label class="block text-[11px] text-slate-600 mb-1 font-semibold">Complemento</label>
+                    <input type="text" id="fTomadorComplemento" placeholder="Sala, Bloco, Andar (opcional)" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs outline-none bg-white">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rodapé Navegação Etapa 1 -->
+          <div class="pt-5 border-t border-slate-200/80 flex items-center justify-end">
+            <button type="button" onclick="App.goToEmissionStep(2)" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center space-x-2 active:scale-95">
+              <span>Avançar para 2ª Etapa: Serviço</span>
+              <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div> <!-- Fim de emissionStepContainer-1 -->
+
+        <!-- CONTAINER ETAPA 2: SERVIÇO -->
+        <div id="emissionStepContainer-2" class="hidden space-y-6">
+
+          <!-- SEÇÃO 4: LOCAL DO FORNECIMENTO/PRESTAÇÃO DO SERVIÇO -->
+          <div class="space-y-4 pt-1">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-teal-500"></span>
+              <span>LOCAL DO FORNECIMENTO/PRESTAÇÃO DO SERVIÇO</span>
+            </h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">País <span class="text-rose-500">*</span></label>
+                <select id="fPaisPrestacao" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+                  <option value="1058" selected>Brasil</option>
+                  <option value="EXTERIOR">Exterior</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Município <span class="text-rose-500">*</span></label>
+                <select id="fLocalPrestacaoIbge" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+                  <option value="2800308" selected>Aracaju/SE</option>
+                  <option value="2803500">Lagarto/SE</option>
+                  <option value="2804805">Nossa Senhora do Socorro/SE</option>
+                  <option value="3550308">São Paulo/SP</option>
+                  <option value="3304557">Rio de Janeiro/RJ</option>
+                  <option value="3106200">Belo Horizonte/MG</option>
+                  <option value="2927408">Salvador/BA</option>
+                  <option value="5300108">Brasília/DF</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- SEÇÃO 5: SERVIÇO/FORNECIMENTO PRESTADO -->
+          <div class="space-y-4 pt-4 border-t border-slate-100">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+              <span>SERVIÇO/FORNECIMENTO PRESTADO</span>
+            </h3>
+
+            <!-- Código de Tributação Nacional com Autocomplete Inteligente -->
+            <div class="relative" id="comboboxCTribNacWrapper">
+              <div class="flex items-center justify-between mb-1">
+                <label class="block text-xs font-semibold text-slate-700">
+                  Código de Tributação Nacional / Atividade <span class="text-rose-500">*</span>
+                </label>
+                <span class="text-[10px] text-slate-400 font-medium">LC 116/2003 • Digite número ou descrição</span>
+              </div>
+              <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <i data-lucide="search" class="w-4 h-4"></i>
+                </div>
+                <input type="text" id="fCTribNacSearch" autocomplete="off"
+                  placeholder="Pesquise por código (ex: 1719, 1005, 0101) ou atividade (ex: contabilidade, corretagem, ti, advocacia, clínica)..."
+                  class="w-full pl-9 pr-9 py-2.5 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white shadow-sm placeholder:text-slate-400">
+                <button type="button" id="btnToggleCTribNacDropdown" onclick="App.toggleCTribNacDropdown()" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors" title="Ver lista de atividades">
+                  <i data-lucide="chevron-down" class="w-4 h-4"></i>
+                </button>
+              </div>
+              
+              <!-- Input oculto para envio do formulário -->
+              <input type="hidden" id="fCTribNac" name="fCTribNac" value="100901">
+
+              <!-- Badge do Item Selecionado -->
+              <div id="cTribNacSelectedBadge" class="mt-2 flex items-center justify-between p-2.5 rounded-xl bg-emerald-50/90 border border-emerald-200 text-xs text-emerald-950">
+                <div class="flex items-center space-x-2 truncate">
+                  <span id="badgeCTribNacCode" class="font-mono font-bold bg-emerald-200/90 text-emerald-900 px-2 py-0.5 rounded text-[11px]">10.09.01.000</span>
+                  <span id="badgeCTribNacDesc" class="truncate font-semibold text-emerald-950">Representação comercial de qualquer natureza e representação mercantil</span>
+                </div>
+                <span id="badgeCTribNacAliq" class="text-[11px] font-bold text-emerald-800 shrink-0 ml-3 bg-white px-2 py-0.5 rounded-md border border-emerald-200">Alíq. Sugerida: 3,00%</span>
+              </div>
+
+              <!-- Dropdown Flutuante de Autocomplete -->
+              <div id="fCTribNacDropdown" class="hidden absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-72 overflow-y-auto divide-y divide-slate-100 text-xs">
+                <!-- Populado dinamicamente -->
+              </div>
+            </div>
+
+            <!-- Benefício Fiscal (Imunidade, Exportação, Não Incidência) -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1 flex items-center space-x-1.5">
+                <span>O serviço/fornecimento prestado é um caso de: imunidade, exportação de serviço ou não incidência do ISSQN?</span>
+                <span class="text-rose-500">*</span>
+              </label>
+              <div class="flex items-center space-x-6 pt-1">
+                <label class="flex items-center space-x-2 cursor-pointer text-xs">
+                  <input type="radio" name="fBeneficioIss" value="nao" checked onchange="App.handleBeneficioIssChange('nao')" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                  <span class="text-slate-800 font-semibold">Não</span>
+                </label>
+                <label class="flex items-center space-x-2 cursor-pointer text-xs">
+                  <input type="radio" name="fBeneficioIss" value="sim" onchange="App.handleBeneficioIssChange('sim')" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                  <span class="text-slate-700">Sim</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Município de Incidência e Data de Competência -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center space-x-1.5">
+                  <span>Município de incidência do ISSQN</span>
+                  <i data-lucide="help-circle" class="w-3.5 h-3.5 text-slate-400"></i>
+                </label>
+                <input type="text" id="fMunicipioIncidencia" readonly value="Aracaju/SE" class="w-full px-3 py-2 border border-slate-200 bg-slate-100 rounded-xl text-xs font-medium text-slate-700 outline-none cursor-not-allowed">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Data de Competência</label>
+                <input type="text" id="dispDataCompetencia" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 rounded-xl text-xs font-semibold text-slate-700 outline-none cursor-not-allowed">
+              </div>
+            </div>
+
+            <!-- NBS e Código Indicador da Operação -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Item da NBS com Autocomplete Inteligente (Opcional) -->
+              <div class="relative" id="comboboxItemNbsWrapper">
+                <div class="flex items-center justify-between mb-1">
+                  <label class="block text-xs font-semibold text-slate-700 flex items-center space-x-1">
+                    <span>Item da NBS correspondente ao serviço</span>
+                    <span class="text-slate-400 font-normal text-[11px]">(Opcional)</span>
+                  </label>
+                  <div class="flex items-center space-x-2">
+                    <button type="button" onclick="App.clearItemNbs()" class="text-[10px] text-rose-500 hover:text-rose-700 font-semibold hover:underline">
+                      Não informar / Limpar
+                    </button>
+                    <span class="text-slate-300">•</span>
+                    <span class="text-[10px] text-slate-400 font-medium">NBS</span>
+                  </div>
+                </div>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <i data-lucide="search" class="w-4 h-4"></i>
+                  </div>
+                  <input type="text" id="fItemNbsSearch" autocomplete="off"
+                    placeholder="Opcional • Digite código ou serviço (ou deixe em branco)..."
+                    class="w-full pl-9 pr-9 py-2.5 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white shadow-sm placeholder:text-slate-400">
+                  <button type="button" id="btnToggleItemNbsDropdown" onclick="App.toggleItemNbsDropdown()" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors" title="Ver lista de códigos NBS">
+                    <i data-lucide="chevron-down" class="w-4 h-4"></i>
+                  </button>
+                </div>
+
+                <!-- Input oculto para envio do formulário (vazio por padrão) -->
+                <input type="hidden" id="fItemNbs" name="fItemNbs" value="">
+
+                <!-- Badge do Item NBS Selecionado -->
+                <div id="itemNbsSelectedBadge" class="hidden mt-2 flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800">
+                  <div class="flex items-center space-x-2 truncate">
+                    <span id="badgeItemNbsCode" class="font-mono font-bold bg-slate-200 text-slate-800 px-2 py-0.5 rounded text-[11px]">-</span>
+                    <span id="badgeItemNbsDesc" class="truncate font-semibold text-slate-900">-</span>
+                  </div>
+                  <div class="flex items-center space-x-2 shrink-0 ml-2">
+                    <span id="badgeItemNbsCat" class="text-[10px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">-</span>
+                    <button type="button" onclick="App.clearItemNbs()" class="text-slate-400 hover:text-rose-600 p-0.5 rounded hover:bg-slate-200 transition-colors" title="Remover NBS">
+                      <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Dropdown Flutuante de Autocomplete NBS -->
+                <div id="fItemNbsDropdown" class="hidden absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-72 overflow-y-auto divide-y divide-slate-100 text-xs">
+                  <!-- Populado dinamicamente -->
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center space-x-1.5">
+                  <span>Código indicador da operação</span>
+                  <i data-lucide="help-circle" class="w-3.5 h-3.5 text-slate-400"></i>
+                </label>
+                <select id="fCodigoIndicadorOperacao" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+                  <option value="1" selected>1 - Operação Normal / Tributável</option>
+                  <option value="2">2 - Imunidade</option>
+                  <option value="3">3 - Isenção</option>
+                  <option value="4">4 - Não Incidência</option>
+                  <option value="5">5 - Exportação de Serviços</option>
+                  <option value="6">6 - Exigibilidade Suspensa por Decisão Judicial</option>
+                  <option value="7">7 - Exigibilidade Suspensa por Processo Administrativo</option>
+                </select>
+                <input type="hidden" id="fTribIssqn" value="1">
+              </div>
+            </div>
+
+            <!-- Descrição do Serviço com Contador de Caracteres -->
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label class="block text-xs font-semibold text-slate-700">Descrição do Serviço/Fornecimento <span class="text-rose-500">*</span></label>
+                <span id="charCountDescricao" class="text-[11px] font-mono text-slate-500">Total de caracteres: 0 / 2000</span>
+              </div>
+              <textarea id="fDescricaoServico" rows="4" maxlength="2000" oninput="App.handleDescricaoInput(this)" placeholder="Descreva os serviços prestados, dados contratuais e informações necessárias para a perfeita identificação da atividade." class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none leading-relaxed bg-white"></textarea>
+            </div>
+          </div>
+
+          <!-- SEÇÃO 6: INFORMAÇÕES COMPLEMENTARES -->
+          <div class="space-y-4 pt-4 border-t border-slate-100">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+              <span>INFORMAÇÕES COMPLEMENTARES</span>
+            </h3>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Número do documento de responsabilidade técnica</label>
+              <input type="text" id="fArtRrt" placeholder="Ex: ART, RRT, CAU (se houver)" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Documento de referência</label>
+              <textarea id="fDocReferencia" rows="2" placeholder="Ex: Número do contrato, pedido de compras (PO), ordem de fornecimento" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none leading-relaxed bg-white"></textarea>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Informações complementares</label>
+              <textarea id="fInformacoesComplementares" rows="3" placeholder="Informações de interesse do contribuinte, dados bancários para depósito via PIX, observações fiscais, etc." class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none leading-relaxed bg-white"></textarea>
+            </div>
+          </div>
+
+          <!-- Rodapé Navegação Etapa 2 -->
+          <div class="pt-5 border-t border-slate-200/80 flex items-center justify-between">
+            <button type="button" onclick="App.goToEmissionStep(1)" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition-all flex items-center space-x-1.5 border border-slate-300 active:scale-95">
+              <i data-lucide="arrow-left" class="w-4 h-4"></i>
+              <span>Voltar: Pessoas</span>
+            </button>
+            <button type="button" onclick="App.goToEmissionStep(3)" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center space-x-2 active:scale-95">
+              <span>Avançar para 3ª Etapa: Valores</span>
+              <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div> <!-- Fim de emissionStepContainer-2 -->
+
+        <!-- CONTAINER ETAPA 3: VALORES -->
+        <div id="emissionStepContainer-3" class="hidden space-y-6">
+
+          <!-- SEÇÃO 7: VALORES DO FORNECIMENTO / SERVIÇO PRESTADO -->
+          <div class="space-y-4 pt-1">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+              <span>VALORES DO FORNECIMENTO/SERVIÇO PRESTADO</span>
+            </h3>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center space-x-1">
+                  <span>Valor da operação/serviço prestado</span>
+                  <span class="text-rose-500">*</span>
+                  <i data-lucide="help-circle" class="w-3.5 h-3.5 text-slate-400"></i>
+                </label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-semibold text-slate-500">R$</span>
+                  <input type="number" id="fValorServico" step="0.01" min="0" placeholder="0,00" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center space-x-1">
+                  <span>Valor recebido pelo intermediário</span>
+                  <i data-lucide="help-circle" class="w-3.5 h-3.5 text-slate-400"></i>
+                </label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-semibold text-slate-400">R$</span>
+                  <input type="number" id="fValorIntermediario" step="0.01" min="0" placeholder="0,00" class="w-full pl-9 pr-3 py-2 border border-slate-200 bg-slate-50 rounded-xl text-xs font-mono text-slate-700 outline-none">
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center space-x-1">
+                  <span>Desconto incondicionado</span>
+                  <i data-lucide="help-circle" class="w-3.5 h-3.5 text-slate-400"></i>
+                </label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-semibold text-slate-400">R$</span>
+                  <input type="number" id="fDescontoIncondicionado" step="0.01" min="0" placeholder="0,00" class="w-full pl-9 pr-3 py-2 border border-slate-200 bg-slate-50 rounded-xl text-xs font-mono text-slate-700 outline-none">
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center space-x-1">
+                  <span>Desconto condicionado</span>
+                  <i data-lucide="help-circle" class="w-3.5 h-3.5 text-slate-400"></i>
+                </label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-semibold text-slate-400">R$</span>
+                  <input type="number" id="fDescontoCondicionado" step="0.01" min="0" placeholder="0,00" class="w-full pl-9 pr-3 py-2 border border-slate-200 bg-slate-50 rounded-xl text-xs font-mono text-slate-700 outline-none">
+                </div>
+              </div>
+            </div>
+
+            <!-- Alerta Informativo do Simples Nacional -->
+            <div class="p-3 bg-blue-50/70 border border-blue-200/80 rounded-xl text-xs text-blue-900 leading-relaxed">
+              As informações de Tributação Municipal abaixo, exceto retenção, não podem ser alteradas pois o tributo (ISSQN) será apurado pelo Simples Nacional. Para alguns serviços, dedução/redução pode ser alterada. Confira as regras do sistema.
+            </div>
+
+            <!-- TRIBUTAÇÃO MUNICIPAL -->
+            <div class="space-y-4 pt-1">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center space-x-1.5">
+                <span>TRIBUTAÇÃO MUNICIPAL</span>
+              </h4>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Tributação do ISSQN sobre o serviço prestado</label>
+                  <select id="fTribIssqn" class="w-full px-3 py-2 border border-slate-200 bg-slate-100 rounded-xl text-xs font-medium text-slate-700 outline-none cursor-not-allowed">
+                    <option value="1" selected>Operação Tributável</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center space-x-1">
+                    <span>Regime Especial de Tributação</span>
+                    <span class="text-rose-500">*</span>
+                    <i data-lucide="help-circle" class="w-3.5 h-3.5 text-slate-400"></i>
+                  </label>
+                  <select id="fRegEspTribSelect" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+                    <option value="0" selected>Nenhum</option>
+                    <option value="1">1 - Ato Cooperado</option>
+                    <option value="2">2 - Estimativa</option>
+                    <option value="3">3 - Microempresa Municipal</option>
+                    <option value="4">4 - Notário ou Registrador</option>
+                    <option value="5">5 - Profissional Autônomo</option>
+                    <option value="6">6 - Sociedade de Profissionais</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Perguntas de Suspensão, Retenção e Benefício Municipal -->
+              <div class="space-y-3 pt-1">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">
+                    A exigibilidade do recolhimento do ISSQN devido nesta operação está suspensa? <span class="text-rose-500">*</span>
+                  </label>
+                  <div class="flex items-center space-x-6 pt-0.5">
+                    <label class="flex items-center space-x-2 cursor-pointer text-xs">
+                      <input type="radio" name="fExigibilidadeSuspensa" value="nao" checked class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                      <span class="text-slate-800 font-semibold">Não</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer text-xs">
+                      <input type="radio" name="fExigibilidadeSuspensa" value="sim" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                      <span class="text-slate-700">Sim</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="pt-2 border-t border-slate-100">
+                  <div class="flex items-center justify-between mb-1">
+                    <label class="block text-xs font-bold text-slate-700">
+                      Há retenção do ISSQN pelo Tomador ou pelo Intermediário? <span class="text-rose-500">*</span>
+                    </label>
+                    <span id="badgeRetencaoAutoDetect" class="hidden text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md flex items-center space-x-1">
+                      <i data-lucide="shield-alert" class="w-3 h-3 text-amber-600"></i>
+                      <span id="txtBadgeRetencaoAutoDetect">Tomador Responsável Tributário por Lei</span>
+                    </span>
+                  </div>
+                  <div class="flex items-center space-x-6 pt-0.5">
+                    <label class="flex items-center space-x-2 cursor-pointer text-xs">
+                      <input type="radio" name="fRetencaoIssqnRadio" value="nao" checked onchange="App.handleRetencaoIssqnChange('nao')" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                      <span class="text-slate-800 font-semibold">Não</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer text-xs">
+                      <input type="radio" name="fRetencaoIssqnRadio" value="sim" onchange="App.handleRetencaoIssqnChange('sim')" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                      <span class="text-slate-700 font-semibold">Sim</span>
+                    </label>
+                  </div>
+
+                  <!-- Aviso de atenção caso tomador seja Caixa / Banco / Órgão Público mas usuário marcou Não -->
+                  <div id="alertTomadorRetencaoAviso" class="hidden mt-2 p-2.5 bg-amber-50/90 border border-amber-300 rounded-xl text-xs text-amber-900 flex items-start space-x-2">
+                    <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"></i>
+                    <div>
+                      <span class="font-bold">Atenção ao Responsável Tributário:</span>
+                      <span id="txtTomadorRetencaoAviso">O tomador informado (ex: Caixa Econômica Federal) é legalmente qualificado como Responsável Tributário pela retenção na fonte do ISSQN (art. 6º da LC 116/2003).</span>
+                    </div>
+                  </div>
+
+                  <!-- BLOCO DE RETENÇÃO DO ISSQN (Idêntico ao layout oficial do Emissor Nacional) -->
+                  <div id="boxOpcoesRetencaoIssqn" class="hidden mt-3 pt-3 border-t border-slate-200 space-y-3.5 bg-slate-50/60 p-4 rounded-xl border border-slate-200">
+                    <div>
+                      <label class="block text-xs font-bold text-slate-800 mb-2">
+                        Informe abaixo por quem o imposto será retido <span class="text-rose-500">*</span>
+                      </label>
+                      <div class="space-y-2">
+                        <label class="flex items-center space-x-2.5 cursor-pointer text-xs p-1.5 rounded-lg hover:bg-white transition-colors border border-transparent hover:border-slate-200">
+                          <input type="radio" name="fQuemRetemIssqn" value="tomador" checked onchange="App.handleQuemRetemIssqnChange('tomador')" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                          <span class="font-bold text-slate-800">Retido pelo Tomador</span>
+                          <span class="text-slate-400">|</span>
+                          <span id="lblRetidoTomadorDesc" class="font-mono text-slate-700 font-medium">00.000.000/0000-00 - Tomador Não Informado</span>
+                        </label>
+                        <label class="flex items-center space-x-2.5 cursor-pointer text-xs p-1.5 rounded-lg hover:bg-white transition-colors border border-transparent hover:border-slate-200">
+                          <input type="radio" name="fQuemRetemIssqn" value="intermediario" onchange="App.handleQuemRetemIssqnChange('intermediario')" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                          <span class="font-bold text-slate-800">Retido pelo Intermediário</span>
+                          <span class="text-slate-400">|</span>
+                          <span id="lblRetidoIntermediarioDesc" class="text-slate-500 italic">Não informado</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <!-- Botões de Ação: Editar Tomador e Incluir Intermediário -->
+                    <div class="flex flex-wrap items-center gap-2 pt-0.5">
+                      <button type="button" onclick="App.editarTomadorNaEtapa1()" class="px-3.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition-all active:scale-95">
+                        <i data-lucide="edit-3" class="w-3.5 h-3.5 text-slate-600"></i>
+                        <span>Editar Tomador</span>
+                      </button>
+                      <button type="button" onclick="App.abrirModalIntermediario()" id="btnAcaoIntermediario" class="px-3.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition-all active:scale-95">
+                        <i data-lucide="plus" class="w-3.5 h-3.5 text-slate-600"></i>
+                        <span id="txtBtnAcaoIntermediario">Incluir Intermediário</span>
+                      </button>
+                    </div>
+
+                    <!-- Caixa Informativa Oficial do Emissor Nacional -->
+                    <div class="p-3 bg-blue-50/90 border border-blue-200 text-blue-900 rounded-xl text-xs leading-relaxed flex items-start space-x-2.5 shadow-xs">
+                      <i data-lucide="info" class="w-4 h-4 text-blue-600 shrink-0 mt-0.5"></i>
+                      <span>Para o prestador de serviço ME/EPP com apuração do ISSQN pelo simples nacional, é obrigatório informar alíquota quando há indicação de retenção do ISSQN. Neste caso é permitido informar alíquota mínima de 1,8%.</span>
+                    </div>
+
+                    <!-- Campo da Alíquota Obrigatória -->
+                    <div class="space-y-1.5 pt-0.5">
+                      <label class="block text-xs font-bold text-slate-800">
+                        Informe o valor da alíquota <span class="text-rose-500">*</span>
+                      </label>
+                      <div class="relative w-36">
+                        <input type="number" id="fAliquotaRetencao" step="0.01" min="1.8" max="5.0" placeholder="2,00" value="2.00" oninput="App.handleAliquotaRetencaoInput(this)" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 pr-8 bg-white shadow-xs">
+                        <span class="absolute inset-y-0 right-0 flex items-center pr-3 text-xs font-bold text-slate-500">%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pt-2 border-t border-slate-100">
+                  <label class="block text-xs font-bold text-slate-700 mb-1">
+                    Este serviço prestado está amparado por algum benefício municipal? <span class="text-rose-500">*</span>
+                  </label>
+                  <div class="flex items-center space-x-6 pt-0.5">
+                    <label class="flex items-center space-x-2 cursor-pointer text-xs">
+                      <input type="radio" name="fBeneficioMunicipal" value="nao" checked class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                      <span class="text-slate-800 font-semibold">Não</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer text-xs">
+                      <input type="radio" name="fBeneficioMunicipal" value="sim" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                      <span class="text-slate-700">Sim</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Dedução / Redução BC ISSQN -->
+              <div class="space-y-2 pt-2 border-t border-slate-100">
+                <label class="block text-xs font-bold text-slate-700">
+                  Será aplicado algum tipo de Dedução/Redução à base de cálculo do ISSQN? <span class="text-rose-500">*</span>
+                </label>
+                <div class="p-3 bg-blue-50/70 border border-blue-200/80 rounded-xl text-xs text-blue-900 leading-relaxed">
+                  Na data de competência informada, o município de incidência definido para esta NFS-e não permite nenhum tipo de redução da base de cálculo do ISSQN.
+                </div>
+                <input type="hidden" id="fValorDeducoes" value="0.00">
+              </div>
+
+              <!-- Alíquota, BC ISSQN, Valor ISSQN (read-only como no print 2) -->
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center space-x-1">
+                    <span>Alíquota</span>
+                    <i data-lucide="help-circle" class="w-3.5 h-3.5 text-slate-400"></i>
+                  </label>
+                  <div class="relative">
+                    <input type="text" id="fAliquotaIss" readonly value="-" class="w-full px-3 py-2 border border-slate-200 bg-slate-100 rounded-xl text-xs font-mono font-medium text-slate-700 outline-none text-right pr-8 cursor-not-allowed">
+                    <span class="absolute inset-y-0 right-0 flex items-center pr-3 text-xs text-slate-500">%</span>
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center space-x-1">
+                    <span>BC ISSQN</span>
+                    <i data-lucide="help-circle" class="w-3.5 h-3.5 text-slate-400"></i>
+                  </label>
+                  <div class="relative">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-semibold text-slate-400">R$</span>
+                    <input type="text" id="calcBaseCalculoIss" readonly value="-" class="w-full pl-9 pr-3 py-2 border border-slate-200 bg-slate-100 rounded-xl text-xs font-mono font-medium text-slate-700 outline-none cursor-not-allowed">
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center space-x-1">
+                    <span>Valor ISSQN</span>
+                    <i data-lucide="help-circle" class="w-3.5 h-3.5 text-slate-400"></i>
+                  </label>
+                  <div class="relative">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-semibold text-slate-400">R$</span>
+                    <input type="text" id="calcValorIssDisp" readonly value="-" class="w-full pl-9 pr-3 py-2 border border-slate-200 bg-slate-100 rounded-xl text-xs font-mono font-medium text-slate-700 outline-none cursor-not-allowed">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- TRIBUTAÇÃO FEDERAL -->
+            <div class="space-y-4 pt-4 border-t border-slate-100">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center space-x-1.5">
+                <span>TRIBUTAÇÃO FEDERAL</span>
+              </h4>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Situação Tributária do PIS/COFINS</label>
+                  <select id="fCstPisCofins" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+                    <option value="" selected>Selecione...</option>
+                    <option value="00">00 - Não se aplica (Simples Nacional)</option>
+                    <option value="01">01 - Operação Tributável com Alíquota Básica</option>
+                    <option value="02">02 - Operação Tributável com Alíquota Diferenciada</option>
+                    <option value="04">04 - Operação Tributável Monofásica - Revenda a Alíquota Zero</option>
+                    <option value="06">06 - Operação Tributável a Alíquota Zero</option>
+                    <option value="07">07 - Operação Isenta da Contribuição</option>
+                    <option value="08">08 - Operação sem Incidência da Contribuição</option>
+                    <option value="09">09 - Operação com Suspensão da Contribuição</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Tipo de retenção do PIS/COFINS/CSLL</label>
+                  <select id="fTipoRetencaoPisCofinsCsll" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+                    <option value="" selected>Selecione...</option>
+                    <option value="1">1 - Não Retido / Não se aplica</option>
+                    <option value="2">2 - Retido pelo Tomador</option>
+                    <option value="3">3 - Retido pelo Intermediário</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- IRRF, Contribuições Sociais - Retidas, Contribuição Previdenciária - Retida -->
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center space-x-1">
+                    <span>IRRF</span>
+                    <i data-lucide="help-circle" class="w-3.5 h-3.5 text-slate-400"></i>
+                  </label>
+                  <div class="relative">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-semibold text-slate-400">R$</span>
+                    <input type="number" id="fRetIr" step="0.01" min="0" placeholder="0,00" class="w-full pl-9 pr-3 py-2 border border-slate-200 bg-slate-50 rounded-xl text-xs font-mono text-slate-700 outline-none">
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center space-x-1">
+                    <span>Contribuições Sociais - Retidas</span>
+                    <i data-lucide="help-circle" class="w-3.5 h-3.5 text-slate-400"></i>
+                  </label>
+                  <div class="relative">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-semibold text-slate-400">R$</span>
+                    <input type="number" id="fRetContrSociais" step="0.01" min="0" placeholder="0,00" class="w-full pl-9 pr-3 py-2 border border-slate-200 bg-slate-50 rounded-xl text-xs font-mono text-slate-700 outline-none">
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center space-x-1">
+                    <span>Contribuição Previdenciária - Retida</span>
+                    <i data-lucide="help-circle" class="w-3.5 h-3.5 text-slate-400"></i>
+                  </label>
+                  <div class="relative">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-semibold text-slate-400">R$</span>
+                    <input type="number" id="fRetInss" step="0.01" min="0" placeholder="0,00" class="w-full pl-9 pr-3 py-2 border border-slate-200 bg-slate-50 rounded-xl text-xs font-mono text-slate-700 outline-none">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- IBS/CBS (Reforma Tributária) -->
+            <div class="space-y-3 pt-4 border-t border-slate-100">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center space-x-1.5">
+                <span>IBS/CBS</span>
+              </h4>
+
+              <div class="p-3 bg-blue-50/70 border border-blue-200/80 rounded-xl text-xs text-blue-900 leading-relaxed">
+                Selecione os códigos de Situação e Classificação Tributária apropriados para o IBS/CBS.
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center space-x-1">
+                    <span>Código de Situação Tributária</span>
+                    <i data-lucide="help-circle" class="w-3.5 h-3.5 text-slate-400"></i>
+                  </label>
+                  <select id="fCstIbsCbs" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+                    <option value="" selected>Selecione...</option>
+                    <option value="01">01 - Tributada integralmente</option>
+                    <option value="02">02 - Tributada com alíquota reduzida</option>
+                    <option value="03">03 - Isenção ou imunidade</option>
+                    <option value="04">04 - Não incidência</option>
+                    <option value="05">05 - Regime Específico</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center space-x-1">
+                    <span>Código de Classificação Tributária</span>
+                    <i data-lucide="help-circle" class="w-3.5 h-3.5 text-slate-400"></i>
+                  </label>
+                  <select id="fCClassIbsCbs" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+                    <option value="" selected>Selecione...</option>
+                    <option value="000000">000000 - Geral / Operação Padrão</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="p-3 bg-blue-50/70 border border-blue-200/80 rounded-xl text-xs text-blue-900 leading-relaxed">
+                Documentos referenciados nos casos de reembolso, repasse e ressarcimento que serão considerados na base de cálculo do IBS/CBS. Podem ser informados os seguintes documentos: NFS-e, NF-e, CT-e, Outros Documentos Fiscais e Outros Documentos.
+              </div>
+
+              <div class="pt-1">
+                <button type="button" onclick="App.showToast('Opção de inclusão de documentos referenciados IBS/CBS registrada!')" class="px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-colors">
+                  <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                  <span>Incluir Documento</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- VALOR APROXIMADO DOS TRIBUTOS -->
+            <div class="space-y-4 pt-4 border-t border-slate-100">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center space-x-1.5">
+                <span>VALOR APROXIMADO DOS TRIBUTOS</span>
+              </h4>
+
+              <div class="p-3 bg-blue-50/70 border border-blue-200/80 rounded-xl text-xs text-blue-900 leading-relaxed">
+                As informações dos valores aproximados dos tributos podem ser pré-configuradas, agilizando a emissão da NFS-e. Para isto, acesse a opção "Configurações" no menu principal.
+              </div>
+
+              <div class="space-y-2">
+                <label class="flex items-center space-x-2 cursor-pointer text-xs">
+                  <input type="radio" name="fModoValorAproxTrib" value="monetario" onchange="App.handleModoTribAproxChange('monetario')" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                  <span class="text-slate-700">Preencher os valores monetários em cada NFS-e emitida</span>
+                </label>
+                <label class="flex items-center space-x-2 cursor-pointer text-xs">
+                  <input type="radio" name="fModoValorAproxTrib" value="percentual" onchange="App.handleModoTribAproxChange('percentual')" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                  <span class="text-slate-700">Configurar os valores percentuais correspondentes</span>
+                </label>
+                <label class="flex items-center space-x-2 cursor-pointer text-xs">
+                  <input type="radio" name="fModoValorAproxTrib" value="simples" checked onchange="App.handleModoTribAproxChange('simples')" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                  <span class="text-slate-800 font-semibold">Informar alíquota do Simples Nacional</span>
+                </label>
+              </div>
+
+              <div id="boxAliqSimplesNac" class="pt-1">
+                <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center space-x-1">
+                  <span>Alíquota no Simples Nacional</span>
+                  <span class="text-rose-500">*</span>
+                  <i data-lucide="help-circle" class="w-3.5 h-3.5 text-slate-400"></i>
+                </label>
+                <div class="relative w-full sm:w-64">
+                  <input type="number" id="fAliquotaSimplesNacional" step="0.01" min="0" max="100" value="15.50" placeholder="15.50" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none bg-white text-right pr-8">
+                  <span class="absolute inset-y-0 right-0 flex items-center pr-3 text-xs font-semibold text-slate-500">%</span>
+                </div>
+              </div>
+
+              <!-- Resumo e Cálculo em Tempo Real -->
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl text-center">
+                <div>
+                  <span class="text-[10px] uppercase font-bold text-emerald-800 block">ISS Calculado</span>
+                  <span id="calcValorIss" class="text-sm font-bold text-emerald-950 font-mono">Simples Nacional</span>
+                </div>
+                <div>
+                  <span class="text-[10px] uppercase font-bold text-emerald-800 block">ISS Retido</span>
+                  <span id="calcValorIssRet" class="text-sm font-bold text-emerald-950 font-mono">R$ 0,00</span>
+                </div>
+                <div>
+                  <span class="text-[10px] uppercase font-bold text-emerald-800 block">Total Retenções</span>
+                  <span id="calcTotalRetencoes" class="text-sm font-bold text-emerald-950 font-mono">R$ 0,00</span>
+                </div>
+                <div>
+                  <span class="text-[10px] uppercase font-bold text-emerald-800 block">Valor Líquido a Receber</span>
+                  <span id="calcValorLiquido" class="text-base font-extrabold text-emerald-950 font-mono">R$ 0,00</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rodapé Navegação Etapa 3 -->
+          <div class="pt-5 border-t border-slate-200/80 flex items-center justify-between">
+            <button type="button" onclick="App.goToEmissionStep(2)" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition-all flex items-center space-x-1.5 border border-slate-300 active:scale-95">
+              <i data-lucide="arrow-left" class="w-4 h-4"></i>
+              <span>Voltar: Serviço</span>
+            </button>
+            <button type="button" onclick="App.goToEmissionStep(4)" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center space-x-2 active:scale-95">
+              <span>Avançar para 4ª Parte: Revisão</span>
+              <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div> <!-- Fim de emissionStepContainer-3 -->
+
+        <!-- CONTAINER ETAPA 4: REVISÃO COMPLETA -->
+        <div id="emissionStepContainer-4" class="hidden space-y-6">
+          <div class="bg-gradient-to-r from-emerald-50 to-brand-50 p-4 rounded-2xl border border-emerald-200/90 flex items-center space-x-3.5 shadow-sm">
+            <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shrink-0 shadow-sm">
+              <i data-lucide="clipboard-check" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h4 class="text-sm font-bold text-emerald-950">4ª Parte: Revisão e Emissão da NFS-e</h4>
+              <p class="text-xs text-emerald-800">Confira todos os dados abaixo antes de assinar com certificado digital e transmitir ao ADN.</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <!-- Card 1: Pessoas -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm space-y-4 flex flex-col justify-between">
+              <div class="space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                  <span class="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center space-x-1.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                    <span>1. Pessoas</span>
+                  </span>
+                  <button type="button" onclick="App.goToEmissionStep(1)" class="px-2.5 py-1 text-xs text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg font-bold flex items-center space-x-1 transition-colors">
+                    <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                    <span>Editar</span>
+                  </button>
+                </div>
+                <div>
+                  <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Prestador (Emitente)</span>
+                  <div id="revEmitenteNome" class="font-bold text-xs text-slate-900 mt-0.5">-</div>
+                  <div id="revEmitenteDoc" class="text-[11px] font-mono text-slate-500">-</div>
+                  <div id="revEmitenteRegime" class="text-[11px] text-emerald-700 font-semibold mt-0.5">-</div>
+                </div>
+                <div class="pt-2.5 border-t border-slate-100">
+                  <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tomador (Adquirente)</span>
+                  <div id="revTomadorNome" class="font-bold text-xs text-slate-900 mt-0.5">-</div>
+                  <div id="revTomadorDoc" class="text-[11px] font-mono text-slate-500">-</div>
+                  <div id="revTomadorEnd" class="text-[11px] text-slate-500 mt-0.5 leading-snug">-</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 2: Serviço -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm space-y-4 flex flex-col justify-between">
+              <div class="space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                  <span class="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center space-x-1.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                    <span>2. Serviço</span>
+                  </span>
+                  <button type="button" onclick="App.goToEmissionStep(2)" class="px-2.5 py-1 text-xs text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg font-bold flex items-center space-x-1 transition-colors">
+                    <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                    <span>Editar</span>
+                  </button>
+                </div>
+                <div>
+                  <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Atividade Nacional (LC 116)</span>
+                  <div id="revServicoCodigo" class="font-mono font-bold text-xs text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded inline-block my-1">-</div>
+                  <div id="revServicoAtiv" class="text-xs font-medium text-slate-700 leading-snug">-</div>
+                </div>
+                <div class="pt-2.5 border-t border-slate-100">
+                  <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Local & Incidência</span>
+                  <div id="revServicoLoc" class="text-xs font-semibold text-slate-800 mt-0.5">-</div>
+                </div>
+                <div class="pt-2.5 border-t border-slate-100">
+                  <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Descrição do Serviço</span>
+                  <p id="revServicoDesc" class="text-[11px] text-slate-600 line-clamp-3 leading-relaxed mt-0.5">-</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 3: Valores -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm space-y-4 flex flex-col justify-between">
+              <div class="space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                  <span class="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center space-x-1.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+                    <span>3. Valores</span>
+                  </span>
+                  <button type="button" onclick="App.goToEmissionStep(3)" class="px-2.5 py-1 text-xs text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg font-bold flex items-center space-x-1 transition-colors">
+                    <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                    <span>Editar</span>
+                  </button>
+                </div>
+                <div class="space-y-2 text-xs">
+                  <div class="flex justify-between items-center text-slate-600">
+                    <span>Valor da Operação:</span>
+                    <strong id="revValorBruto" class="font-mono text-slate-900 font-bold">R$ 0,00</strong>
+                  </div>
+                  <div class="flex justify-between items-center text-slate-600">
+                    <span>ISSQN Retido:</span>
+                    <strong id="revIssRetido" class="font-mono text-slate-900 font-bold">Não</strong>
+                  </div>
+                  <div class="flex justify-between items-center text-slate-600">
+                    <span>Retenções Federais:</span>
+                    <strong id="revRetFederais" class="font-mono text-slate-900 font-bold">R$ 0,00</strong>
+                  </div>
+                </div>
+                <div class="p-3.5 bg-emerald-50 rounded-xl border border-emerald-200 text-center">
+                  <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block">Valor Líquido da NFS-e</span>
+                  <span id="revValorLiquido" class="text-xl font-black text-emerald-950 font-mono">R$ 0,00</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rodapé Ação Final Etapa 4 -->
+          <div class="pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <button type="button" onclick="App.goToEmissionStep(3)" class="w-full sm:w-auto px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition-all flex items-center justify-center space-x-2 border border-slate-300 active:scale-95">
+              <i data-lucide="arrow-left" class="w-4 h-4"></i>
+              <span>Voltar: Valores</span>
+            </button>
+            <div class="flex items-center space-x-3 w-full sm:w-auto">
+              <button type="button" onclick="App.previewXmlDps()" class="flex-1 sm:flex-initial px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition-colors flex items-center justify-center space-x-1.5 border border-slate-300 active:scale-95">
+                <i data-lucide="file-code" class="w-4 h-4 text-slate-600"></i>
+                <span>Pré-visualizar XML</span>
+              </button>
+              <button id="btnSubmitEmissao" type="button" onclick="App.submitEmission()" class="flex-1 sm:flex-initial px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2 active:scale-95">
+                <i data-lucide="send" class="w-4 h-4"></i>
+                <span>Emitir NFS-e Nacional Agora</span>
+              </button>
+            </div>
+          </div>
+        </div> <!-- Fim de emissionStepContainer-4 -->
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- PAINEL 3: HISTÓRICO ADN (TECNOLOGIA ADN) -->
+      <!-- ========================================== -->
+      <section id="panel-historico" class="tab-content-panel hidden space-y-6">
+        
+        <!-- Cabeçalho Principal do Histórico (Fiel ao Portal e Layout de Referência) -->
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div>
+            <div class="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-100 text-[10px] font-bold uppercase tracking-wider mb-1">
+              <span>TECNOLOGIA ADN</span>
+              <span class="text-sky-300">•</span>
+              <span>Módulo de Consulta Fiscal</span>
+            </div>
+            <h2 class="text-xl font-black text-slate-900 tracking-tight">Histórico de Notas da Empresa Representada</h2>
+            <p id="historySubtitle" class="text-xs text-slate-500 mt-0.5">Notas fiscais vinculadas à empresa ativa sincronizadas via Ambiente de Dados Nacional (ADN)</p>
+          </div>
+          
+          <div class="flex flex-wrap items-center gap-2.5">
+            <!-- Upload em Lote de Arquivos XML -->
+            <input type="file" id="xmlBatchFileInput" accept=".xml" multiple class="hidden" onchange="App.handleXmlBatchUpload(event)">
+            <button onclick="document.getElementById('xmlBatchFileInput').click()" class="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl border border-slate-300 transition-colors flex items-center space-x-1.5 shadow-sm" title="Importar arquivos .xml baixados do portal da Receita Federal">
+              <i data-lucide="upload" class="w-4 h-4 text-slate-600"></i>
+              <span>Importar XMLs</span>
+            </button>
+
+            <!-- Sincronizar Histórico Completo do ADN -->
+            <button id="btnSyncAdnAll" onclick="App.syncAdn(true)" class="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl border border-slate-300 transition-colors flex items-center space-x-1.5 shadow-sm" title="Sincronizar todo o histórico desde o início da empresa no ADN (NSU 0)">
+              <i data-lucide="history" class="w-4 h-4 text-slate-600"></i>
+              <span>Sincronizar Desde o Início</span>
+            </button>
+
+            <!-- Sincronizar com ADN (Incremental / Recentes) -->
+            <button id="btnSyncAdn" onclick="App.syncAdn(false)" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-sm transition-colors flex items-center space-x-1.5 shrink-0">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+              <span>Sincronizar com ADN</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- ======================================================== -->
+        <!-- CARD 1: FILTROS DA PESQUISA -->
+        <!-- ======================================================== -->
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div class="flex items-center space-x-2 text-slate-700">
+              <i data-lucide="sliders-horizontal" class="w-4 h-4 text-slate-600"></i>
+              <h3 class="text-xs font-black uppercase tracking-wider text-slate-800">Filtros da pesquisa</h3>
+            </div>
+            <div class="flex items-center space-x-3">
+              <button type="button" onclick="App.clearHistoryFilters()" class="text-xs text-slate-500 hover:text-slate-800 font-medium px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition-colors">
+                Limpar Filtros
+              </button>
+              <button type="button" onclick="App.applyHistoryFilters()" class="text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white px-4 py-1.5 rounded-lg shadow-sm transition-colors flex items-center space-x-1.5">
+                <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                <span>Pesquisar</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Grid de Campos de Filtros -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 text-xs">
+            <!-- LINHA 1 -->
+            <!-- 1. Número da Nota -->
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Número da Nota</label>
+              <div class="flex items-center space-x-1.5">
+                <select id="fltAnoNota" class="w-24 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium outline-none focus:ring-1 focus:ring-brand-500">
+                  <option value="">Ano</option>
+                  <option value="2026" selected>2026</option>
+                  <option value="2025">2025</option>
+                  <option value="2024">2024</option>
+                  <option value="2023">2023</option>
+                  <option value="2022">2022</option>
+                  <option value="TODOS">Todos</option>
+                </select>
+                <input type="text" id="fltNumeroNota" placeholder="Número sequencial da nota" class="flex-1 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-800 outline-none focus:ring-1 focus:ring-brand-500">
+              </div>
+            </div>
+
+            <!-- 2. Competência com Máscara Estrita MM/AAAA -->
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Competência</label>
+              <div class="flex items-center space-x-1.5">
+                <input type="text" id="fltCompetenciaIni" maxlength="7" placeholder="MM/AAAA" class="w-1/2 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-800 text-center font-mono outline-none focus:ring-1 focus:ring-brand-500">
+                <span class="text-slate-400 text-xs">até</span>
+                <input type="text" id="fltCompetenciaFim" maxlength="7" placeholder="MM/AAAA" class="w-1/2 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-800 text-center font-mono outline-none focus:ring-1 focus:ring-brand-500">
+              </div>
+            </div>
+
+            <!-- 3. Período de Emissão da Nota -->
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Período de Emissão da Nota</label>
+              <div class="flex items-center space-x-1.5">
+                <input type="date" id="fltDataEmissaoIni" class="w-1/2 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-800 text-[11px] outline-none focus:ring-1 focus:ring-brand-500">
+                <span class="text-slate-400 text-xs">até</span>
+                <input type="date" id="fltDataEmissaoFim" class="w-1/2 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-800 text-[11px] outline-none focus:ring-1 focus:ring-brand-500">
+              </div>
+            </div>
+
+            <!-- 4. Situação -->
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Situação</label>
+              <select id="fltSituacao" class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-700 outline-none focus:ring-1 focus:ring-brand-500">
+                <option value="">Todas</option>
+                <option value="AUTORIZADA">Normal / Autorizada</option>
+                <option value="CANCELADA">Cancelada</option>
+                <option value="SUBSTITUIDA">Substituída</option>
+              </select>
+            </div>
+
+            <!-- LINHA 2 -->
+            <!-- 5. Documento Tomador -->
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Documento Tomador</label>
+              <input type="text" id="fltDocTomador" placeholder="CPF, CNPJ ou IMU" class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-800 outline-none focus:ring-1 focus:ring-brand-500">
+            </div>
+
+            <!-- 6. Número ou Intervalo do RPS -->
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Número ou Intervalo do RPS</label>
+              <div class="flex items-center space-x-1.5">
+                <input type="text" id="fltRpsIni" placeholder="nº inicial do RPS" class="w-1/2 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-800 outline-none focus:ring-1 focus:ring-brand-500">
+                <span class="text-slate-400 text-xs">até</span>
+                <input type="text" id="fltRpsFim" placeholder="nº final do RPS" class="w-1/2 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-800 outline-none focus:ring-1 focus:ring-brand-500">
+              </div>
+            </div>
+
+            <!-- 7. Série do RPS -->
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Série do RPS</label>
+              <input type="text" id="fltSerieRps" placeholder="Série do RPS" class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-800 outline-none focus:ring-1 focus:ring-brand-500">
+            </div>
+
+            <!-- 8. Intervalo de notas -->
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Intervalo de notas</label>
+              <div class="flex items-center space-x-1.5">
+                <input type="text" id="fltNotaIni" placeholder="nº inicial" class="w-1/2 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-800 outline-none focus:ring-1 focus:ring-brand-500">
+                <span class="text-slate-400 text-xs">até</span>
+                <input type="text" id="fltNotaFim" placeholder="nº final" class="w-1/2 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-800 outline-none focus:ring-1 focus:ring-brand-500">
+              </div>
+            </div>
+
+            <!-- LINHA 3 -->
+            <!-- 9. Tipo Serviço / Código de Tributação Nacional com Autocomplete Inteligente -->
+            <div class="sm:col-span-2 relative" id="comboboxFltTipoServicoWrapper">
+              <label class="block font-semibold text-slate-700 mb-1">Tipo Serviço / Código de Tributação Nacional</label>
+              <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
+                  <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                </div>
+                <input type="text" id="fltTipoServicoSearch" autocomplete="off"
+                  placeholder="Pesquise por código (ex: 1719, 1005) ou atividade (ex: contabilidade, corretagem, ti, advocacia)..."
+                  class="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-800 text-xs outline-none focus:ring-1 focus:ring-brand-500">
+                <button type="button" onclick="App.clearFltTipoServico()" id="btnClearFltTipoServico" class="hidden absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors" title="Limpar filtro de atividade">
+                  <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+              <input type="hidden" id="fltTipoServico" value="">
+
+              <!-- Dropdown Flutuante de Autocomplete -->
+              <div id="fltTipoServicoDropdown" class="hidden absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-64 overflow-y-auto divide-y divide-slate-100 text-xs">
+                <!-- Populado dinamicamente -->
+              </div>
+            </div>
+
+            <!-- 10. Município de Incidência -->
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Município de Incidência</label>
+              <input type="text" id="fltMunicipioIncidencia" placeholder="Informe o Município ou Código IBGE" class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-800 outline-none focus:ring-1 focus:ring-brand-500">
+            </div>
+
+            <!-- 11. Exigibilidade -->
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Exigibilidade</label>
+              <select id="fltExigibilidade" class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-700 outline-none focus:ring-1 focus:ring-brand-500">
+                <option value="">Todas</option>
+                <option value="1">1 - Exigível</option>
+                <option value="2">2 - Não Incidência</option>
+                <option value="3">3 - Isenção</option>
+                <option value="4">4 - Imunidade</option>
+                <option value="5">5 - Suspensa por Decisão Judicial</option>
+                <option value="6">6 - Suspensa por Procedimento Administrativo</option>
+              </select>
+            </div>
+
+            <!-- LINHA 4 -->
+            <!-- 12. Indica ISSQN Retido + Checkboxes -->
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Indica ISSQN Retido</label>
+              <select id="fltIssRetido" class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-700 outline-none focus:ring-1 focus:ring-brand-500 mb-2">
+                <option value="">Todos</option>
+                <option value="SIM">Sim (Retido)</option>
+                <option value="NAO">Não (Não Retido)</option>
+              </select>
+              <div class="flex items-center space-x-3 pt-0.5">
+                <label class="inline-flex items-center text-xs text-slate-700 cursor-pointer">
+                  <input type="checkbox" id="fltChkSubstituidas" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500 mr-1.5">
+                  <span>Notas Substituídas</span>
+                </label>
+                <label class="inline-flex items-center text-xs text-slate-700 cursor-pointer">
+                  <input type="checkbox" id="fltChkAvulsas" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500 mr-1.5">
+                  <span>Notas Avulsas</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- 13. Período RPS -->
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Período RPS</label>
+              <div class="flex items-center space-x-1.5">
+                <input type="date" id="fltRpsDataIni" class="w-1/2 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-800 text-[11px] outline-none focus:ring-1 focus:ring-brand-500">
+                <span class="text-slate-400 text-xs">até</span>
+                <input type="date" id="fltRpsDataFim" class="w-1/2 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-800 text-[11px] outline-none focus:ring-1 focus:ring-brand-500">
+              </div>
+            </div>
+
+            <!-- 14. Situação Débito -->
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Situação Débito</label>
+              <select id="fltSituacaoDebito" class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-700 outline-none focus:ring-1 focus:ring-brand-500">
+                <option value="">Todas</option>
+                <option value="EM_ABERTO">Em Aberto</option>
+                <option value="LIQUIDADO">Liquidado</option>
+                <option value="SUSPENSO">Suspenso</option>
+                <option value="PARCELADO">Parcelado</option>
+              </select>
+            </div>
+
+            <!-- 15. Chave de Acesso NFSe Nacional -->
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Chave de Acesso NFSe Nacional</label>
+              <div class="flex items-center space-x-1">
+                <input type="text" id="fltChaveAcesso" maxlength="50" placeholder="50 dígitos da chave" class="flex-1 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-800 font-mono text-[11px] outline-none focus:ring-1 focus:ring-brand-500">
+                <button type="button" onclick="App.consultarPorChaveOnline()" class="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-semibold text-[11px] transition-colors whitespace-nowrap" title="Consultar no SEFIN Nacional se não estiver local">
+                  SEFIN
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ======================================================== -->
+        <!-- CARD 2: RESULTADOS LOCALIZADOS -->
+        <!-- ======================================================== -->
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 space-y-4">
+          <!-- Topo do Card de Resultados: Título + Badge de Contagem + Botões de Ação -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div class="flex items-center space-x-2.5">
+              <h3 class="text-xs font-black uppercase tracking-wider text-slate-800">Resultados Localizados</h3>
+              <span id="historyResultsBadge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-50 text-sky-700 border border-sky-200">
+                0 notas encontradas
+              </span>
+            </div>
+
+            <div class="flex items-center space-x-2">
+              <button type="button" onclick="App.exportHistoryCsv()" class="px-3.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-lg border border-slate-300 transition-colors flex items-center space-x-1.5 shadow-sm" title="Exportar todas as notas filtradas para planilha CSV">
+                <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+                <span>Exportar CSV</span>
+              </button>
+              <button type="button" onclick="App.downloadXmlBatchZip()" class="px-3.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-lg border border-slate-300 transition-colors flex items-center space-x-1.5 shadow-sm" title="Baixar pacote ZIP com os arquivos XML de todas as notas filtradas">
+                <i data-lucide="archive" class="w-4 h-4 text-brand-600"></i>
+                <span>Baixar Pacote XML (ZIP)</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Barra de Configuração: Exibir Registros + Filtro de Papel -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600">
+            <div class="flex items-center space-x-2">
+              <span>Exibir</span>
+              <select id="selectPageSize" onchange="App.changePageSize(this.value)" class="px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-700 focus:ring-2 focus:ring-brand-500 outline-none shadow-sm cursor-pointer">
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+                <option value="250">250</option>
+                <option value="500">500</option>
+                <option value="750">750</option>
+                <option value="1000">1.000</option>
+              </select>
+              <span>registros</span>
+            </div>
+
+            <div class="flex items-center space-x-2">
+              <span class="font-medium text-slate-600">Papel:</span>
+              <select id="selectFiltroPapel" onchange="App.applyHistoryFilters()" class="px-3 py-1 bg-white border border-slate-300 rounded-lg text-xs text-slate-700 font-semibold focus:ring-2 focus:ring-brand-500 outline-none shadow-sm cursor-pointer">
+                <option value="TODAS">Todas (Emitidas & Recebidas)</option>
+                <option value="EMITIDAS" selected>Emitidas pela Empresa</option>
+                <option value="RECEBIDAS">Recebidas como Tomador</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- ======================================================== -->
+          <!-- SCROLLBAR HORIZONTAL SUPERIOR (SINCRONIZADA) -->
+          <!-- ======================================================== -->
+          <div id="tableScrollTopWrapper" class="overflow-x-auto overflow-y-hidden border border-slate-200 border-b-0 rounded-t-xl bg-slate-50" style="height: 14px;">
+            <div id="tableScrollTopInner" style="height: 1px;"></div>
+          </div>
+
+          <!-- ======================================================== -->
+          <!-- TABELA DE HISTÓRICO COM AS 17 COLUNAS OFICIAIS -->
+          <!-- ======================================================== -->
+          <div id="tableScrollBottomWrapper" class="overflow-x-auto border border-slate-200 rounded-b-xl shadow-sm">
+            <table id="mainHistoryTable" class="w-full text-left whitespace-nowrap text-xs border-collapse">
+              <thead class="bg-slate-50 text-[11px] font-bold text-slate-700 border-b border-slate-200 uppercase">
+                <tr>
+                  <th class="py-2.5 px-3 border-r border-slate-200 text-center">Situação <span class="text-blue-600 text-[9px]">▲</span></th>
+                  <th class="py-2.5 px-3 border-r border-slate-200 text-center">Tomador</th>
+                  <th class="py-2.5 px-4 border-r border-slate-200">Razão Social</th>
+                  <th class="py-2.5 px-3 border-r border-slate-200 text-center">Número</th>
+                  <th class="py-2.5 px-3 border-r border-slate-200 text-right">Serviço(R$)</th>
+                  <th class="py-2.5 px-3 border-r border-slate-200 text-right">Total(R$)</th>
+                  <th class="py-2.5 px-2.5 border-r border-slate-200 text-right">Alíq.(%)</th>
+                  <th class="py-2.5 px-3 border-r border-slate-200 text-right">ISSQN(R$)</th>
+                  <th class="py-2.5 px-2.5 border-r border-slate-200 text-center">Retido</th>
+                  <th class="py-2.5 px-3 border-r border-slate-200 text-center">Emissão</th>
+                  <th class="py-2.5 px-2.5 border-r border-slate-200 text-center">Comp.</th>
+                  <th class="py-2.5 px-3 border-r border-slate-200 text-center">Incidência</th>
+                  <th class="py-2.5 px-2.5 border-r border-slate-200 text-center">Atividade</th>
+                  <th class="py-2.5 px-2.5 border-r border-slate-200 text-center">Tipo</th>
+                  <th class="py-2.5 px-2.5 border-r border-slate-200 text-center">Débito</th>
+                  <th class="py-2.5 px-3 border-r border-slate-200 text-center">CNAE</th>
+                  <th class="py-2.5 px-3 text-center">Opções</th>
+                </tr>
+              </thead>
+              <tbody id="historyTableBody">
+                <!-- Populado dinamicamente -->
+              </tbody>
+              <tfoot id="historyTableFoot" class="bg-slate-50 border-t-2 border-slate-300 text-xs font-semibold">
+                <!-- Renderizado dinamicamente com Subtotal e Total -->
+              </tfoot>
+            </table>
+          </div>
+
+          <!-- ======================================================== -->
+          <!-- BARRA DE NAVEGAÇÃO DA PAGINAÇÃO INFERIOR -->
+          <!-- ======================================================== -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-200 text-xs text-slate-600">
+            <div id="paginationInfo" class="font-medium text-slate-700">
+              Mostrando 0 registros
+            </div>
+            <div id="paginationControls" class="flex items-center space-x-1">
+              <!-- Renderizado dinamicamente -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- PAINEL 4: CERTIFICADO DIGITAL -->
+      <!-- ========================================== -->
+      <section id="panel-certificado" class="tab-content-panel hidden space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          <!-- Card de Upload de Certificado -->
+          <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 space-y-4">
+            <div class="flex items-center space-x-2 border-b border-slate-100 pb-3">
+              <i data-lucide="key" class="w-5 h-5 text-amber-500"></i>
+              <h3 class="text-sm font-bold text-slate-900">Importar Certificado A1 do Procurador</h3>
+            </div>
+            <p class="text-xs text-slate-500 leading-relaxed">
+              Faça upload do seu certificado digital modelo A1 (.pfx ou .p12). O sistema utiliza OpenSSL 3 e criptografia nativa para extrair com segurança as chaves de assinatura e autenticar a conexão mTLS com a Receita Federal.
+            </p>
+
+            <form id="certUploadForm" onsubmit="App.uploadCertificate(event)" class="space-y-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Arquivo do Certificado (.pfx / .p12)</label>
+                <input type="file" name="certFile" accept=".pfx,.p12" required class="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer">
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Senha do Certificado</label>
+                <input type="password" name="password" placeholder="Digite a senha do arquivo .pfx" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 outline-none">
+              </div>
+
+              <button id="btnUploadCert" type="submit" class="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl shadow transition-colors flex items-center justify-center space-x-2">
+                <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+                <span>Carregar e Ativar Certificado A1</span>
+              </button>
+            </form>
+          </div>
+
+          <!-- Card de Dados do Certificado Ativo -->
+          <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div class="flex items-center space-x-2">
+                <i data-lucide="shield-check" class="w-5 h-5 text-emerald-500"></i>
+                <h3 class="text-sm font-bold text-slate-900">Certificado Digital em Uso</h3>
+              </div>
+              <button id="btnRemoveCert" onclick="App.removeCertificate()" class="text-[11px] text-rose-600 hover:text-rose-700 font-semibold hidden">
+                Desvincular Certificado
+              </button>
+            </div>
+            
+            <div id="certDetailsCard">
+              <!-- Populado dinamicamente -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- PAINEL 5: AMBIENTES & DIAGNÓSTICO -->
+      <!-- ========================================== -->
+      <section id="panel-conexoes" class="tab-content-panel hidden space-y-6">
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 space-y-6">
+          <div class="border-b border-slate-100 pb-4">
+            <h2 class="text-lg font-bold text-slate-900">Ambiente de Operação & Diagnóstico de Conexões</h2>
+            <p class="text-xs text-slate-500">Configure o modo de emissão da NFS-e e monitore a conectividade mTLS com a Receita Federal</p>
+          </div>
+
+          <!-- Card de Modo de Emissão Atual e Status de Conexão (Movido do cabeçalho) -->
+          <div class="bg-slate-50 border border-slate-200 rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div class="space-y-1">
+              <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Modo de Emissão Ativo</span>
+              <div class="flex items-center space-x-3">
+                <div id="envSelectorBtn" class="flex items-center space-x-2" title="Clique para alternar o ambiente de operação">
+                  <div id="currentEnvBadge" class="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white shadow-sm flex items-center space-x-2 cursor-pointer bg-rose-600 hover:opacity-90 transition-opacity">
+                    <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+                    <span>PRODUÇÃO NACIONAL</span>
+                  </div>
+                </div>
+                <span class="text-xs text-slate-500 hidden sm:inline">Neste modo, notas emitidas têm validade jurídica plena na Receita Federal.</span>
+              </div>
+            </div>
+
+            <!-- Indicadores de Conexão com RFB e SERPRO -->
+            <div class="flex items-center space-x-4 bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs shadow-sm shrink-0">
+              <div class="flex items-center space-x-1.5" title="Conexão Direta mTLS com a RFB ADN">
+                <span id="connRfbStatus" class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+                <span class="text-slate-700 font-semibold text-[11px]">RFB Direta</span>
+              </div>
+              <span class="text-slate-200">|</span>
+              <div class="flex items-center space-x-1.5" title="Gateway SERPRO OAuth2">
+                <span id="connSerproStatus" class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+                <span class="text-slate-700 font-semibold text-[11px]">SERPRO</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Diagnóstico de Conexão em Destaque -->
+          <div class="bg-gradient-to-r from-slate-900 to-indigo-950 rounded-2xl p-6 text-white shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div class="space-y-1">
+              <span class="text-[10px] font-bold text-indigo-300 uppercase tracking-wider block">Diagnóstico de Conectividade RFB / SERPRO</span>
+              <h3 class="text-base font-bold text-white">Teste Completo de Comunicação e Handshake mTLS</h3>
+              <p class="text-xs text-slate-300">Executa ping real nos endpoints da Receita Federal e SERPRO medindo latência e status.</p>
+            </div>
+            <button id="btnRunDiagnostic" onclick="App.runLiveDiagnostic()" class="px-5 py-3 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-lg transition-all flex items-center space-x-2 shrink-0">
+              <i data-lucide="activity" class="w-4 h-4"></i>
+              <span>Executar Diagnóstico Agora</span>
+            </button>
+          </div>
+
+          <!-- Os 3 Ambientes Oficiais -->
+          <div>
+            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Selecione o Ambiente de Operação</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <!-- Teste -->
+              <div onclick="App.switchEnvironment('TESTE')" class="border-2 border-slate-200 hover:border-emerald-500 rounded-2xl p-5 cursor-pointer hover:shadow-md transition-all space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">AMBIENTE 1</span>
+                </div>
+                <h4 class="font-bold text-slate-900 text-sm">Teste (Sandbox Oficial)</h4>
+                <p class="text-xs text-slate-600">Ambiente oficial de validação da RFB e SERPRO para testes de integração.</p>
+                <div class="text-[10px] text-emerald-700 font-semibold font-mono">adn.producaorestrita.nfse.gov.br</div>
+              </div>
+
+              <!-- Homologação -->
+              <div onclick="App.switchEnvironment('HOMOLOGACAO')" class="border-2 border-slate-200 hover:border-amber-500 rounded-2xl p-5 cursor-pointer hover:shadow-md transition-all space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">AMBIENTE 2</span>
+                </div>
+                <h4 class="font-bold text-slate-900 text-sm">Homologação (Produção Restrita)</h4>
+                <p class="text-xs text-slate-600">Servidores oficiais de homologação da RFB e SERPRO.</p>
+                <div class="text-[10px] text-amber-700 font-semibold font-mono">adn.producaorestrita.nfse.gov.br</div>
+              </div>
+
+              <!-- Produção -->
+              <div onclick="App.switchEnvironment('PRODUCAO')" class="border-2 border-slate-200 hover:border-rose-500 rounded-2xl p-5 cursor-pointer hover:shadow-md transition-all space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">AMBIENTE 3</span>
+                </div>
+                <h4 class="font-bold text-slate-900 text-sm">Produção Nacional Oficial</h4>
+                <p class="text-xs text-slate-600">Ambiente de produção definitivo da Receita Federal. Validade jurídica plena.</p>
+                <div class="text-[10px] text-rose-700 font-semibold font-mono">adn.nfse.gov.br</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Credenciais SERPRO Opcionais -->
+          <div class="bg-slate-50 rounded-xl p-5 border border-slate-200 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-800">Credenciais API SERPRO (Gateway OAuth2 - Opcional)</span>
+              <span class="text-[11px] text-slate-500">Utilizado como canal redundante de contingência</span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Consumer Key</label>
+                <input type="text" id="cfgSerproKey" placeholder="Chave do aplicativo SERPRO" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono outline-none">
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Consumer Secret</label>
+                <input type="password" id="cfgSerproSecret" placeholder="Segredo do aplicativo SERPRO" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono outline-none">
+              </div>
+            </div>
+            <div class="text-right">
+              <button onclick="App.saveSerproSettings()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-xl transition-colors">
+                Salvar Credenciais SERPRO
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- PAINEL 6: DICIONÁRIO DE ERROS AMIGÁVEIS -->
+      <!-- ========================================== -->
+      <section id="panel-ajuda" class="tab-content-panel hidden space-y-6">
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 space-y-4">
+          <div class="border-b border-slate-100 pb-3">
+            <h2 class="text-lg font-bold text-slate-900">Dicionário Amigável de Erros Fiscais</h2>
+            <p class="text-xs text-slate-500">Todas as mensagens de rejeição da Receita Federal e do SERPRO explicadas em português simples com soluções passo-a-passo</p>
+          </div>
+
+          <div id="errorDictList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Populado dinamicamente -->
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL 1: SELETOR DE CLIENTES REPRESENTADOS  -->
+  <!-- Limpo, rápido e sem poluição visual         -->
+  <!-- ========================================== -->
+  <div id="representationModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-slate-200 overflow-hidden fade-in flex flex-col max-h-[85vh]">
+      <!-- Header minimalista e sofisticado -->
+      <div class="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+            <i data-lucide="building-2" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <h3 class="font-bold text-sm text-white">Clientes Representados</h3>
+              <span id="repClientsCountBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800/60">0</span>
+            </div>
+            <p class="text-[11px] text-slate-400">Clique para alternar a empresa representada em 1 clique</p>
+          </div>
+        </div>
+        <button onclick="App.closeRepresentationModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Barra de Busca Rápida -->
+      <div class="p-3 bg-slate-50 border-b border-slate-200">
+        <div class="relative">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+          <input type="text" id="repSearchInput" oninput="App.filterRepresentationClients(this.value)" placeholder="Digite o nome do cliente ou CNPJ..." class="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 outline-none">
+        </div>
+      </div>
+
+      <!-- Lista Compacta de Clientes (Scrollável, limpa, sem cards gigantes) -->
+      <div id="repClientsList" class="overflow-y-auto divide-y divide-slate-100 max-h-72 text-xs">
+        <!-- Renderizado dinamicamente -->
+      </div>
+
+      <!-- Rodapé Compacto: Adicionar Novo CNPJ -->
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex flex-col space-y-2">
+        <form onsubmit="App.submitRepresentar(event)" class="flex items-center space-x-2">
+          <div class="relative flex-1">
+            <input type="text" id="repDocInput" placeholder="+ Adicionar outro cliente (CPF ou CNPJ)..." class="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+          <button id="btnSubmitRep" type="submit" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-sm transition-colors flex items-center space-x-1 shrink-0">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            <span>Adicionar</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL 2: RESULTADOS DE DIAGNÓSTICO         -->
+  <!-- ========================================== -->
+  <div id="diagnosticModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-xl w-full border border-slate-200 overflow-hidden fade-in flex flex-col max-h-[90vh]">
+      <!-- Header -->
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <i data-lucide="activity" class="w-5 h-5 text-emerald-400"></i>
+          <h3 class="font-bold text-sm">Diagnóstico Completo de Conexões e Certificado</h3>
+        </div>
+        <button onclick="App.closeDiagnosticModal()" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Body com os Resultados -->
+      <div id="diagModalBody" class="p-6 overflow-y-auto space-y-4 text-xs">
+        <!-- Populado dinamicamente com os testes -->
+      </div>
+
+      <!-- Footer -->
+      <div class="px-6 py-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
+        <span class="text-[11px] text-slate-500 font-mono" id="diagTimestamp">-</span>
+        <div class="flex space-x-2">
+          <button onclick="App.copyDiagnosticReport()" class="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold rounded-lg text-xs">
+            Copiar Relatório
+          </button>
+          <button onclick="App.closeDiagnosticModal()" class="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-lg text-xs">
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Troca de Ambientes -->
+  <div id="envSwitchModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-slate-200 p-6 space-y-5 fade-in">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 class="text-base font-bold text-slate-900">Selecionar Ambiente de Emissão</h3>
+        <button onclick="App.closeEnvModal()" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <div onclick="App.switchEnvironment('TESTE')" class="p-4 rounded-xl border border-slate-200 hover:border-emerald-500 bg-white hover:bg-emerald-50/20 cursor-pointer transition-all">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-sm text-slate-900">1. Ambiente de Teste (Sandbox Oficial)</span>
+            <span class="text-xs font-bold text-emerald-600">Servidores Oficiais</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">Conecta aos servidores de homologação da RFB para testes sem valor fiscal.</p>
+        </div>
+
+        <div onclick="App.switchEnvironment('HOMOLOGACAO')" class="p-4 rounded-xl border border-slate-200 hover:border-amber-500 bg-white hover:bg-amber-50/20 cursor-pointer transition-all">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-sm text-slate-900">2. Homologação (Produção Restrita)</span>
+            <span class="text-xs font-bold text-amber-600">Recomendado</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">Servidores oficiais de homologação da Receita Federal e SERPRO.</p>
+        </div>
+
+        <div onclick="App.switchEnvironment('PRODUCAO')" class="p-4 rounded-xl border border-slate-200 hover:border-rose-500 bg-white hover:bg-rose-50/20 cursor-pointer transition-all">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-sm text-slate-900">3. Produção Nacional</span>
+            <span class="text-xs font-bold text-rose-600">Validade Jurídica Real</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">Emite notas fiscais oficiais com apuração tributária real para as empresas representadas.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL 3: PRÉ-VISUALIZAÇÃO DO XML DA DPS     -->
+  <!-- ========================================== -->
+  <div id="xmlPreviewModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full border border-slate-200 overflow-hidden fade-in flex flex-col max-h-[90vh]">
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <i data-lucide="code" class="w-5 h-5 text-emerald-400"></i>
+          <div>
+            <h3 class="font-bold text-sm">Estrutura XML da DPS v1.00 (CGNFS-e)</h3>
+            <span id="xmlPreviewChave" class="text-[10px] text-slate-400 font-mono block">Chave de Acesso: Calculando...</span>
+          </div>
+        </div>
+        <button onclick="App.closeXmlPreviewModal()" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-4 overflow-y-auto flex-1 bg-slate-950 font-mono text-[11px] text-emerald-300">
+        <pre id="xmlPreviewContent" class="whitespace-pre-wrap break-all leading-relaxed"></pre>
+      </div>
+
+      <div class="px-6 py-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
+        <span class="text-[11px] text-slate-500">Documento pronto para assinatura digital XMLDSig RSA-SHA256</span>
+        <div class="flex space-x-2">
+          <button onclick="App.copyXmlPreview()" class="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold rounded-lg text-xs">
+            Copiar XML
+          </button>
+          <button onclick="App.closeXmlPreviewModal()" class="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-lg text-xs">
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Salvar Preenchimento Atual como Modelo -->
+  <div id="modalSalvarModelo" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden fade-in">
+      <div class="px-6 py-4 bg-emerald-700 text-white flex items-center justify-between">
+        <h3 class="font-bold text-sm uppercase tracking-wider flex items-center space-x-2">
+          <i data-lucide="bookmark-plus" class="w-4 h-4"></i>
+          <span>Salvar Modelo de Nota Fiscal</span>
+        </h3>
+        <button type="button" onclick="App.closeSaveCurrentAsTemplateModal()" class="text-white/80 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <form onsubmit="App.submitSalvarModelo(event)" class="p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Nome do Modelo <span class="text-rose-500">*</span></label>
+          <input type="text" id="tplNomeInput" required placeholder="Ex: Honorários Mensais, Consultoria TI, Locação..." class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+          <p class="text-[11px] text-slate-400 mt-1">Este modelo ficará salvo exclusivamente para a empresa representada atual.</p>
+        </div>
+
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs">
+          <div class="font-bold text-slate-700 text-[11px] uppercase tracking-wider">Itens que serão memorizados no Modelo:</div>
+          <div class="text-slate-600 flex items-center space-x-1.5">
+            <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 shrink-0"></i>
+            <span>Atividade LC 116 e Código de Tributação Nacional</span>
+          </div>
+          <div class="text-slate-600 flex items-center space-x-1.5">
+            <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 shrink-0"></i>
+            <span>Descrição do Serviço e Observações Complementares</span>
+          </div>
+          <div class="text-slate-600 flex items-center space-x-1.5">
+            <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 shrink-0"></i>
+            <span>Regras de Retenção de ISSQN e Tributos Federais</span>
+          </div>
+          <div class="text-slate-600 flex items-center space-x-1.5">
+            <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 shrink-0"></i>
+            <span>Valor Padrão da Operação (se preenchido)</span>
+          </div>
+          <p class="text-[10px] text-emerald-700 font-semibold pt-1">O Tomador ficará livre para ser preenchido a cada emissão.</p>
+        </div>
+
+        <div class="flex items-center justify-end space-x-3 pt-2">
+          <button type="button" onclick="App.closeSaveCurrentAsTemplateModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl">
+            Cancelar
+          </button>
+          <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow">
+            Salvar Modelo
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Gerenciar Modelos de Nota Fiscal -->
+  <div id="modalGerenciarModelos" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full border border-slate-200 overflow-hidden fade-in flex flex-col max-h-[85vh]">
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <i data-lucide="settings-2" class="w-4 h-4 text-brand-400"></i>
+          <h3 class="font-bold text-sm uppercase tracking-wider">Modelos Salvos da Empresa</h3>
+        </div>
+        <button type="button" onclick="App.closeManageTemplatesModal()" class="text-white/80 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto space-y-4 flex-1">
+        <p class="text-xs text-slate-500">Abaixo estão os modelos de emissão cadastrados para <strong id="manageTemplatesCompanyName" class="text-slate-800">a empresa atual</strong>.</p>
+        
+        <div id="manageTemplatesList" class="space-y-2.5">
+          <!-- Populado dinamicamente -->
+        </div>
+      </div>
+
+      <div class="px-6 py-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
+        <button type="button" onclick="App.openSaveCurrentAsTemplateModal(); App.closeManageTemplatesModal();" class="text-xs text-emerald-700 hover:text-emerald-800 font-bold flex items-center space-x-1">
+          <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+          <span>Criar Novo Modelo a partir do Formulário</span>
+        </button>
+        <button type="button" onclick="App.closeManageTemplatesModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold text-xs rounded-xl">
+          Fechar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Dados do Intermediário do Serviço -->
+  <div id="modalIntermediario" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden fade-in">
+      <div class="px-6 py-4 bg-slate-800 text-white flex items-center justify-between">
+        <h3 class="font-bold text-sm uppercase tracking-wider flex items-center space-x-2">
+          <i data-lucide="user-plus" class="w-4 h-4 text-emerald-400"></i>
+          <span>Intermediário do Serviço</span>
+        </h3>
+        <button type="button" onclick="App.closeModalIntermediario()" class="text-white/80 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <form onsubmit="App.salvarIntermediario(event)" class="p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">CPF ou CNPJ do Intermediário <span class="text-rose-500">*</span></label>
+          <input type="text" id="fIntermDoc" required placeholder="000.000.000-00 ou 00.000.000/0000-00" oninput="App.formatDocInput(this)" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Nome Completo / Razão Social <span class="text-rose-500">*</span></label>
+          <input type="text" id="fIntermNome" required placeholder="Nome ou razão social do intermediário" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Inscrição Municipal (opcional)</label>
+          <input type="text" id="fIntermIm" placeholder="Inscrição Municipal" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+        </div>
+        <div class="flex items-center justify-between pt-2">
+          <button type="button" onclick="App.limparIntermediario()" class="text-xs text-rose-600 hover:text-rose-700 font-semibold flex items-center space-x-1">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            <span>Remover</span>
+          </button>
+          <div class="flex items-center space-x-2">
+            <button type="button" onclick="App.closeModalIntermediario()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl">
+              Cancelar
+            </button>
+            <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow">
+              Salvar
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scripts da Aplicação -->
+  <script src="js/errorModal.js"></script>
+  <script src="js/danfseViewer.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
