@@ -28,6 +28,7 @@ data/settings.json
 *.zip
 
 # Arquivos temporários do SO
+cloudflared.exe
 .DS_Store
 Thumbs.db
 .vscode/
