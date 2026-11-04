@@ -810,7 +810,7 @@ app.get('/api/errors/dictionary', (req, res) => {
 
 // Inicia servidor apenas se executado diretamente
 if (require.main === module) {
-  app.listen(PORT, () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`=======================================================`);
     console.log(`  EMISSOR NACIONAL DE NOTAS FISCAIS (NFS-e ADN / RFB)  `);
     console.log(`  Servidor rodando em: http://localhost:${PORT}        `);
