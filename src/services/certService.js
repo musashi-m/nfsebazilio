@@ -20,10 +20,11 @@ const DATA_DIR = isServerless ? path.join(os.tmpdir(), 'emissor_data') : BASE_DA
 const CERT_PFX_FILE = path.join(DATA_DIR, 'active_cert.pfx');
 const CERT_META_FILE = path.join(DATA_DIR, 'active_cert_meta.json');
 
-// Localização do OpenSSL (Git for Windows ou PATH do sistema)
+// Localização do OpenSSL (Git for Windows, Linux /usr/bin/openssl ou PATH do sistema)
 const OPENSSL_CANDIDATES = [
   'C:\\Program Files\\Git\\usr\\bin\\openssl.exe',
   'C:\\Program Files (x86)\\Git\\usr\\bin\\openssl.exe',
+  '/usr/bin/openssl',
   'openssl'
 ];
 
@@ -153,8 +154,19 @@ class CertService {
     try {
       fs.writeFileSync(tempPfxPath, pfxBuffer);
       const safePass = (password || '').replace(/"/g, '\\"');
-      const cmd = `"${this.opensslPath}" pkcs12 -in "${tempPfxPath}" -passin pass:"${safePass}" -nodes`;
-      const output = execSync(cmd, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+      let output;
+      try {
+        const cmd = `"${this.opensslPath}" pkcs12 -in "${tempPfxPath}" -passin pass:"${safePass}" -nodes`;
+        output = execSync(cmd, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+      } catch (err1) {
+        // Fallback para OpenSSL 3 no Linux (comum no Render/Ubuntu para cifras legado de certificados A1 ICP-Brasil)
+        try {
+          const cmdLegacy = `"${this.opensslPath}" pkcs12 -in "${tempPfxPath}" -passin pass:"${safePass}" -nodes -legacy`;
+          output = execSync(cmdLegacy, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+        } catch (_) {
+          throw err1;
+        }
+      }
 
       const keyMatch = output.match(/-----BEGIN (?:RSA |EC )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC )?PRIVATE KEY-----/);
       const allCerts = [...output.matchAll(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g)].map(m => m[0]);

@@ -6,6 +6,7 @@
  */
 
 const https = require('https');
+const crypto = require('crypto');
 const axios = require('axios');
 const zlib = require('zlib');
 const { ENVIRONMENTS, CONNECTION_SETTINGS } = require('../config/environments');
@@ -29,7 +30,10 @@ class AdnService {
     const baseTlsOptions = {
       rejectUnauthorized: false,
       keepAlive: false,
-      minVersion: 'TLSv1.2'
+      minVersion: 'TLSv1.2',
+      ciphers: 'DEFAULT:@SECLEVEL=1:ALL:!aNULL:!eNULL:!MD5',
+      honorCipherOrder: true,
+      secureOptions: (crypto.constants.SSL_OP_LEGACY_SERVER_CONNECT || 0) | (crypto.constants.SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION || 0)
     };
 
     if (certData.keyPem && certData.certPem) {
