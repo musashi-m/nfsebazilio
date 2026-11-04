@@ -1,0 +1,35 @@
+# Dependências
+node_modules/
+package-lock.json
+
+# SEGURANÇA CRÍTICA: Certificados Digitais e Chaves Privadas
+*.pfx
+*.p12
+*.pem
+*.key
+*.crt
+*.cer
+data/active_cert.pfx
+data/active_cert_meta.json
+data/*.pfx
+data/*.p12
+
+# Dados em runtime e históricos de clientes
+data/nfse_history.json
+data/adn_sync_state.json
+data/recent_representations.json
+data/companies.json
+data/settings.json
+
+# Variáveis de ambiente locais
+.env
+.env.local
+*.log
+*.zip
+
+# Arquivos temporários do SO
+cloudflared.exe
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
