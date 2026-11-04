@@ -5,8 +5,12 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
-const DATA_DIR = path.join(__dirname, '../../data');
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const BASE_DATA_DIR = path.join(__dirname, '../../data');
+const DATA_DIR = isServerless ? path.join(os.tmpdir(), 'emissor_data') : BASE_DATA_DIR;
+
 const NFSE_FILE = path.join(DATA_DIR, 'nfse_history.json');
 const COMPANIES_FILE = path.join(DATA_DIR, 'companies.json');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
@@ -20,8 +24,22 @@ class StorageService {
   }
 
   _ensureDir() {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      if (isServerless && fs.existsSync(BASE_DATA_DIR)) {
+        const files = fs.readdirSync(BASE_DATA_DIR);
+        for (const file of files) {
+          const srcFile = path.join(BASE_DATA_DIR, file);
+          const destFile = path.join(DATA_DIR, file);
+          if (!fs.existsSync(destFile) && fs.statSync(srcFile).isFile()) {
+            try { fs.copyFileSync(srcFile, destFile); } catch (_) {}
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Aviso ao inicializar DATA_DIR:', e.message);
     }
   }
 

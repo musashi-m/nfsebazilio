@@ -10,9 +10,13 @@ const path = require('path');
 const crypto = require('crypto');
 const { execSync } = require('child_process');
 const forge = require('node-forge');
+const os = require('os');
 const { translateError } = require('./errorTranslator');
 
-const DATA_DIR = path.join(__dirname, '../../data');
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const BASE_DATA_DIR = path.join(__dirname, '../../data');
+const DATA_DIR = isServerless ? path.join(os.tmpdir(), 'emissor_data') : BASE_DATA_DIR;
+
 const CERT_PFX_FILE = path.join(DATA_DIR, 'active_cert.pfx');
 const CERT_META_FILE = path.join(DATA_DIR, 'active_cert_meta.json');
 

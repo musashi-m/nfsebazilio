@@ -8,10 +8,13 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const axios = require('axios');
 const storageService = require('./storageService');
 
-const DATA_DIR = path.join(__dirname, '../../data');
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const BASE_DATA_DIR = path.join(__dirname, '../../data');
+const DATA_DIR = isServerless ? path.join(os.tmpdir(), 'emissor_data') : BASE_DATA_DIR;
 const RECENT_FILE = path.join(DATA_DIR, 'recent_representations.json');
 
 class RepresentationService {
@@ -20,11 +23,15 @@ class RepresentationService {
   }
 
   _ensureFile() {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    if (!fs.existsSync(RECENT_FILE)) {
-      fs.writeFileSync(RECENT_FILE, JSON.stringify([], null, 2), 'utf8');
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      if (!fs.existsSync(RECENT_FILE)) {
+        fs.writeFileSync(RECENT_FILE, JSON.stringify([], null, 2), 'utf8');
+      }
+    } catch (e) {
+      console.warn('Aviso ao inicializar arquivo de representações:', e.message);
     }
   }
 
