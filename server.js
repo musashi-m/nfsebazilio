@@ -34,7 +34,7 @@ const {
 const { ITENS_NBS } = require('./src/utils/nbsCodes');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || (process.env.NODE_ENV === 'production' ? 8080 : 3000);
 
 // Configuração de Multer para upload em memória do certificado .pfx
 const upload = multer({
