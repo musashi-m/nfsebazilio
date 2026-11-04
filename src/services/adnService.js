@@ -31,11 +31,31 @@ class AdnService {
       rejectUnauthorized: false,
       keepAlive: false,
       minVersion: 'TLSv1.2',
-      ciphers: 'DEFAULT:@SECLEVEL=1:ALL:!aNULL:!eNULL:!MD5',
+      maxVersion: 'TLSv1.2', // OBRIGATÓRIO: SERPRO / ADN tem bug documentado no TLS 1.3 que causa "bad record mac / decryption failed" no Linux
+      ciphers: [
+        'ECDHE-RSA-AES128-GCM-SHA256',
+        'ECDHE-RSA-AES256-GCM-SHA384',
+        'ECDHE-ECDSA-AES128-GCM-SHA256',
+        'ECDHE-ECDSA-AES256-GCM-SHA384',
+        'AES128-GCM-SHA256',
+        'AES256-GCM-SHA384',
+        'HIGH:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!SRP:!CAMELLIA:!CBC'
+      ].join(':'),
       honorCipherOrder: true,
       secureOptions: (crypto.constants.SSL_OP_LEGACY_SERVER_CONNECT || 0) | (crypto.constants.SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION || 0)
     };
 
+    // 1. Prioridade máxima: PFX direto (inclui a cadeia completa de ACs da ICP-Brasil necessária no Linux)
+    if (certData.pfxBuffer && certData.password !== undefined) {
+      return new https.Agent({
+        ...baseTlsOptions,
+        pfx: certData.pfxBuffer,
+        passphrase: certData.password || '',
+        timeout: 30000
+      });
+    }
+
+    // 2. Fallback para chaves PEM avulsas
     if (certData.keyPem && certData.certPem) {
       return new https.Agent({
         ...baseTlsOptions,
