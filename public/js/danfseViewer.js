@@ -347,8 +347,8 @@ class DanfseViewer {
     else if (tribISSQN === '4') tipoTribISS = 'Imunidade';
 
     const xLocIncid = getXml('xLocIncid') || xLocEmi;
-    const tpRetISSQN = getXml('tpRetISSQN') || (nfse.valores?.issRetido ? '2' : '1');
-    const retencaoIss = tpRetISSQN === '2' ? 'Retido' : 'Não Retido';
+    const tpRetISSQN = getXml('tpRetISSQN') || (nfse.valores?.issRetido ? '2' : (nfse.valores?.tpRetIssqn ? String(nfse.valores.tpRetIssqn) : '1'));
+    const retencaoIss = (tpRetISSQN === '2' || tpRetISSQN === '3' || nfse.valores?.iss?.retido || nfse.valores?.issRetido) ? 'Retido' : 'Não Retido';
 
     // Valores
     const vServ = getXml('vServ') || nfse.valores?.vServ || nfse.valores?.valorServico || 0;

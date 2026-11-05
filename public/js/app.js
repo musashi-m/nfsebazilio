@@ -896,7 +896,7 @@ const App = {
       setVal('fDescontoCondicionado', vDescCond > 0 ? vDescCond.toFixed(2) : '');
 
       // Retenção ISSQN
-      const isRetido = Boolean(v.iss?.retido || v.vISSRet > 0);
+      const isRetido = this.isNotaRetida(sourceNote) || Boolean(v.iss?.retido || v.vISSRet > 0);
       setRadio('fRetencaoIssqnRadio', isRetido ? 'sim' : 'nao');
       this.handleRetencaoIssqnChange(isRetido ? 'sim' : 'nao');
 
@@ -2518,7 +2518,7 @@ const App = {
       const valTotal = Number(n.valores?.valorLiquido ?? n.valores?.vLiq ?? n.valores?.baseCalculo ?? n.valores?.vBC ?? valServico) || 0;
       const aliqIss = Number(n.valores?.iss?.aliquota ?? n.valores?.pAliq ?? n.valores?.pAliqAplic ?? 0) || 0;
       const valIss = Number(n.valores?.iss?.valorIss ?? n.valores?.vISSQN ?? 0) || 0;
-      const isRetido = Boolean(n.valores?.iss?.retido || n.valores?.vISSRet > 0) ? 'SIM' : 'NÃO';
+      const isRetido = this.isNotaRetida(n) ? 'SIM' : 'NÃO';
       
       const dEmissao = n.dataEmissao || n.dataAutorizacao;
       const dataEmissaoFormatada = dEmissao ? new Date(dEmissao).toLocaleDateString('pt-BR') : '';
@@ -2784,9 +2784,9 @@ const App = {
 
     // 12. ISS Retido
     if (issRetido === 'SIM') {
-      notes = notes.filter(n => Boolean(n.valores?.iss?.retido || n.valores?.vISSRet > 0));
+      notes = notes.filter(n => this.isNotaRetida(n));
     } else if (issRetido === 'NAO') {
-      notes = notes.filter(n => !Boolean(n.valores?.iss?.retido || n.valores?.vISSRet > 0));
+      notes = notes.filter(n => !this.isNotaRetida(n));
     }
 
     this.state.filteredHistory = notes;
@@ -2837,6 +2837,27 @@ const App = {
     const p = Math.max(1, Math.min(pageNum, maxPage));
     this.state.pagination.page = p;
     this.renderHistoryTable();
+  },
+
+  isNotaRetida(n) {
+    if (!n) return false;
+    const v = n.valores || n;
+    if (v.iss?.retido === true || v.retido === true || v.issRetido === true) return true;
+    if (v.tpRetIssqn === 2 || v.tpRetIssqn === 3 || v.tpRetIssqn === '2' || v.tpRetIssqn === '3') return true;
+    if (Number(v.vISSRet) > 0 || Number(v.iss?.valorRetido) > 0) return true;
+
+    // Inspeciona XML da nota caso ainda não esteja enriquecida
+    const xml = n.xmlCompleto || n.xmlAssinado || '';
+    if (xml) {
+      const tpRetMatch = xml.match(/<tpRetISSQN>([^<]+)<\/tpRetISSQN>/i);
+      if (tpRetMatch && (tpRetMatch[1].trim() === '2' || tpRetMatch[1].trim() === '3')) return true;
+      const vTotRetMatch = xml.match(/<vTotalRet>([^<]+)<\/vTotalRet>/i);
+      const vTotRet = vTotRetMatch ? parseFloat(vTotRetMatch[1]) : 0;
+      const vIssMatch = xml.match(/<vISSQN>([^<]+)<\/vISSQN>/i);
+      const vIss = vIssMatch ? parseFloat(vIssMatch[1]) : 0;
+      if (vTotRet > 0 && vIss > 0 && Math.abs(vTotRet - vIss) < 0.05) return true;
+    }
+    return false;
   },
 
   renderHistoryTable() {
@@ -2992,7 +3013,7 @@ const App = {
       const valTotal = n.valores?.valorLiquido || n.valores?.vLiq || n.valores?.baseCalculo || n.valores?.vBC || valServico;
       const aliqIss = n.valores?.iss?.aliquota || n.valores?.pAliq || n.valores?.pAliqAplic || 0;
       const valIss = n.valores?.iss?.valorIss || n.valores?.vISSQN || 0;
-      const isRetido = Boolean(n.valores?.iss?.retido || n.valores?.vISSRet > 0);
+      const isRetido = this.isNotaRetida(n);
 
       // Datas
       const dEmissao = n.dataEmissao || n.dataAutorizacao;

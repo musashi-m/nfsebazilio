@@ -128,17 +128,55 @@ class StorageService {
     }
   }
 
+  // Normaliza retenção de ISS conforme padrão nacional (tpRetISSQN 2 ou 3)
+  normalizeNoteRetention(item) {
+    if (!item) return item;
+    const xml = item.xmlCompleto || item.xmlAssinado || '';
+    const tpRetMatch = xml.match(/<tpRetISSQN>([^<]+)<\/tpRetISSQN>/i);
+    const tpRet = tpRetMatch ? tpRetMatch[1].trim() : null;
+    const vTotRetMatch = xml.match(/<vTotalRet>([^<]+)<\/vTotalRet>/i);
+    const vTotRet = vTotRetMatch ? parseFloat(vTotRetMatch[1]) : 0;
+    const vIssMatch = xml.match(/<vISSQN>([^<]+)<\/vISSQN>/i);
+    const vIss = vIssMatch ? parseFloat(vIssMatch[1]) : 0;
+
+    const isRetido = (tpRet === '2' || tpRet === '3') ||
+      (vTotRet > 0 && vIss > 0 && Math.abs(vTotRet - vIss) < 0.05) ||
+      Boolean(item.valores?.iss?.retido || item.valores?.issRetido || item.valores?.vISSRet > 0);
+
+    if (isRetido) {
+      const vIssVal = item.valores?.iss?.valorIss || vIss || item.valores?.vISSQN || 0;
+      const vRetVal = item.valores?.iss?.valorRetido || item.valores?.vISSRet || (vTotRet > 0 && vIssVal > 0 ? Math.min(vTotRet, vIssVal) : (vTotRet || vIssVal));
+      return {
+        ...item,
+        valores: {
+          ...(item.valores || {}),
+          tpRetIssqn: parseInt(tpRet || '2', 10),
+          issRetido: true,
+          vISSRet: vRetVal,
+          vTotalRet: item.valores?.vTotalRet || vTotRet || vIssVal,
+          iss: {
+            ...(item.valores?.iss || {}),
+            retido: true,
+            valorRetido: vRetVal
+          }
+        }
+      };
+    }
+    return item;
+  }
+
   // --- HISTÓRICO ADN / NFS-E ---
   getHistory(filters = {}) {
     let list = this._getHistoryRaw();
 
-    // Garante consistência de notas com registro de cancelamento
+    // Garante consistência de notas com registro de cancelamento e retenção de ISS
     list = list.map(item => {
-      const isCancelled = item.status === 'CANCELADA' || Boolean(item.dataCancelamento) || Boolean(item.motivoCancelamento);
-      if (isCancelled && item.status !== 'CANCELADA') {
-        return { ...item, status: 'CANCELADA' };
+      let current = item;
+      const isCancelled = current.status === 'CANCELADA' || Boolean(current.dataCancelamento) || Boolean(current.motivoCancelamento);
+      if (isCancelled && current.status !== 'CANCELADA') {
+        current = { ...current, status: 'CANCELADA' };
       }
-      return item;
+      return this.normalizeNoteRetention(current);
     });
 
     // Filtro por CNPJ da empresa representada
@@ -384,10 +422,11 @@ class StorageService {
     if (!chave) return null;
     const cleanChave = chave.replace(/\D/g, '');
     const list = this._getHistoryRaw();
-    return list.find(item => {
+    const found = list.find(item => {
       const itemClean = (item.chaveAcesso || '').replace(/\D/g, '');
       return (itemClean && itemClean === cleanChave) || item.chaveAcesso === chave || item.id === chave;
     });
+    return found ? this.normalizeNoteRetention(found) : null;
   }
 
   updateNfseStatus(chave, status, motivoCancelamento = null) {

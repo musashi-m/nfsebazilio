@@ -202,14 +202,21 @@ class XmlParserService {
 
     // 8. Valores
     const valBlock = this.getTag(xml, 'valores') || '';
-    const vLiq = this.parseFloatSafe(this.getTag(valBlock, 'vLiq') || this.getTag(valBlock, 'vBC') || this.getTag(valBlock, 'vServ'));
-    const vServ = this.parseFloatSafe(this.getTag(valBlock, 'vServ') || this.getTag(valBlock, 'vBC') || this.getTag(valBlock, 'vLiq'));
+    const vLiq = this.parseFloatSafe(this.getTag(valBlock, 'vLiq') || this.getTag(valBlock, 'vBC') || this.getTag(valBlock, 'vServ') || this.getTag(xml, 'vLiq'));
+    const vServ = this.parseFloatSafe(this.getTag(valBlock, 'vServ') || this.getTag(xml, 'vServ') || this.getTag(valBlock, 'vBC') || vLiq);
     const vBC = this.parseFloatSafe(this.getTag(valBlock, 'vBC') || vServ);
-    const vISSQN = this.parseFloatSafe(this.getTag(valBlock, 'vISSQN'));
-    const pAliq = this.parseFloatSafe(this.getTag(valBlock, 'pAliqAplic') || this.getTag(valBlock, 'pAliq'));
-    const vISSRet = this.parseFloatSafe(this.getTag(valBlock, 'vISSRet'));
+    const vISSQN = this.parseFloatSafe(this.getTag(valBlock, 'vISSQN') || this.getTag(xml, 'vISSQN') || this.getTag(xml, 'vISS'));
+    const pAliq = this.parseFloatSafe(this.getTag(valBlock, 'pAliqAplic') || this.getTag(valBlock, 'pAliq') || this.getTag(xml, 'pAliqAplic') || this.getTag(xml, 'pAliq'));
+    const vTotalRet = this.parseFloatSafe(this.getTag(valBlock, 'vTotalRet') || this.getTag(xml, 'vTotalRet'));
+    const vISSRetRaw = this.parseFloatSafe(this.getTag(valBlock, 'vISSRet') || this.getTag(xml, 'vISSRet') || this.getTag(valBlock, 'vRetISS') || this.getTag(xml, 'vRetISS'));
 
-    const retencao = vISSRet > 0 || this.getTag(valBlock, 'tpRetISSQN') === '1' || this.getTag(valBlock, 'tpRetISSQN') === '2';
+    // No padrão nacional: tpRetISSQN: 1 = Não Retido, 2 = Retido pelo Tomador, 3 = Retido pelo Intermediário
+    const tpRetMatch = xml.match(/<tpRetISSQN>([^<]+)<\/tpRetISSQN>/i);
+    const tpRetISSQN = tpRetMatch ? tpRetMatch[1].trim() : (this.getTag(valBlock, 'tpRetISSQN') || '1');
+    const isRetidoByTp = tpRetISSQN === '2' || tpRetISSQN === '3';
+    const isRetidoByVal = vISSRetRaw > 0 || (vTotalRet > 0 && vISSQN > 0 && Math.abs(vTotalRet - vISSQN) < 0.05);
+    const retencao = isRetidoByTp || isRetidoByVal || (vServ > vLiq && vISSQN > 0 && Math.abs((vServ - vLiq) - vISSQN) < 0.05);
+    const vISSRet = retencao ? (vISSRetRaw || (vTotalRet > 0 && vISSQN > 0 ? Math.min(vTotalRet, vISSQN) : (vTotalRet || vISSQN || (vServ > vLiq ? vServ - vLiq : 0)))) : 0;
 
     return {
       id: 'nfse_' + (chaveAcesso || Date.now()),
@@ -268,6 +275,15 @@ class XmlParserService {
         valorServico: vServ || vLiq,
         valorLiquido: vLiq || vServ,
         baseCalculo: vBC,
+        vServ: vServ || vLiq,
+        vLiq: vLiq || vServ,
+        vBC: vBC,
+        vISSQN: vISSQN,
+        pAliq: pAliq,
+        tpRetIssqn: parseInt(tpRetISSQN, 10) || (retencao ? 2 : 1),
+        vTotalRet: vTotalRet,
+        vISSRet: vISSRet,
+        issRetido: retencao,
         iss: {
           valorIss: vISSQN,
           aliquota: pAliq,
