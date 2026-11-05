@@ -130,12 +130,76 @@ class DpsService {
     </interm>`;
     }
 
-    // Construção Civil / Obras (se houver)
+    // Construção Civil / Obras (<obra>) conforme Schema Oficial CGNFS-e / Padrão Nacional
+    // Obrigatório para os subitens LC 116: 07.02.01, 07.02.02, 07.04.01, 07.05.01, 07.05.02,
+    // 07.06.01, 07.06.02, 07.07.01, 07.08.01, 07.17.01, 07.19.01, 14.14.03, 14.14.04
     let xmlConstrucaoCivil = '';
-    if (data.codigoObraCno || data.artRegistro) {
-      xmlConstrucaoCivil = `
-      ${data.codigoObraCno ? `<cObra>${this.escapeXml(data.codigoObraCno)}</cObra>` : ''}
-      ${data.artRegistro ? `<art>${this.escapeXml(data.artRegistro)}</art>` : ''}`;
+    const obra = data.dadosObra || data.obra || {};
+    const tipoObra = obra.tipo || data.tipoObra || (data.codigoObraCno ? 'codigo_obra' : '');
+    const inscImobFisc = (obra.inscImobFisc || data.inscImobFiscObra || data.inscImobFisc || '').trim();
+    const cObra = (obra.codigoObra || data.codigoObra || data.codigoObraCno || '').trim();
+    const cCIB = (obra.cib || data.cibObra || data.cCIB || '').trim().replace(/\D/g, '');
+
+    const hasObraData = cObra || cCIB || obra.cep || data.cepObra || inscImobFisc || (tipoObra && tipoObra !== 'none');
+
+    if (hasObraData) {
+      let xmlEscolhaObra = '';
+      if (tipoObra === 'cib' || (!cObra && cCIB)) {
+        if (cCIB) {
+          xmlEscolhaObra = `\n        <cCIB>${this.escapeXml(cCIB)}</cCIB>`;
+        }
+      } else if (tipoObra === 'endereco_brasil' || (!cObra && !cCIB && (obra.cep || data.cepObra))) {
+        const cMunObra = String(obra.municipioIbge || data.municipioIbgeObra || data.localPrestacaoIbge || cLocPrestacao).padStart(7, '0').slice(-7);
+        const cepObra = String(obra.cep || data.cepObra || '').replace(/\D/g, '').padStart(8, '0').slice(-8);
+        const lgrObra = obra.logradouro || data.logradouroObra || 'NAO INFORMADO';
+        const nroObra = obra.numero || data.numeroObra || 'S/N';
+        const cplObra = obra.complemento || data.complementoObra || '';
+        const bairroObra = obra.bairro || data.bairroObra || 'CENTRO';
+
+        xmlEscolhaObra = `
+        <end>
+          <endNac>
+            <cMun>${cMunObra}</cMun>
+            <CEP>${cepObra}</CEP>
+          </endNac>
+          <xLgr>${this.escapeXml(lgrObra)}</xLgr>
+          <nro>${this.escapeXml(nroObra)}</nro>${cplObra ? `\n          <xCpl>${this.escapeXml(cplObra)}</xCpl>` : ''}
+          <xBairro>${this.escapeXml(bairroObra)}</xBairro>
+        </end>`;
+      } else if (tipoObra === 'endereco_exterior') {
+        const cPaisObra = String(obra.pais || data.paisObra || '1058');
+        const cEndPostObra = String(obra.cep || data.cepExtObra || '00000');
+        const cidObra = obra.cidade || data.cidadeExtObra || 'EXTERIOR';
+        const rgtObra = obra.estado || data.estadoExtObra || 'EXTERIOR';
+        const lgrObra = obra.logradouro || data.logradouroObra || 'NAO INFORMADO';
+        const nroObra = obra.numero || data.numeroObra || 'S/N';
+        const cplObra = obra.complemento || data.complementoObra || '';
+        const bairroObra = obra.bairro || data.bairroObra || 'BAIRRO';
+
+        xmlEscolhaObra = `
+        <end>
+          <endExt>
+            <cPais>${this.escapeXml(cPaisObra)}</cPais>
+            <cEndPost>${this.escapeXml(cEndPostObra)}</cEndPost>
+            <xCid>${this.escapeXml(cidObra)}</xCid>
+            <xRgt>${this.escapeXml(rgtObra)}</xRgt>
+          </endExt>
+          <xLgr>${this.escapeXml(lgrObra)}</xLgr>
+          <nro>${this.escapeXml(nroObra)}</nro>${cplObra ? `\n          <xCpl>${this.escapeXml(cplObra)}</xCpl>` : ''}
+          <xBairro>${this.escapeXml(bairroObra)}</xBairro>
+        </end>`;
+      } else {
+        // Padrão: Código de Obra (CNO / CEI)
+        if (cObra) {
+          xmlEscolhaObra = `\n        <cObra>${this.escapeXml(cObra)}</cObra>`;
+        }
+      }
+
+      if (xmlEscolhaObra) {
+        xmlConstrucaoCivil = `
+      <obra>${inscImobFisc ? `\n        <inscImobFisc>${this.escapeXml(inscImobFisc)}</inscImobFisc>` : ''}${xmlEscolhaObra}
+      </obra>`;
+      }
     }
 
     // Informações Complementares e Documentos de Referência / ART
@@ -309,6 +373,31 @@ ${xmlFinNfse}    <cLocEmi>${cLocEmi}</cLocEmi>
 
     if (!data.descricaoServico || data.descricaoServico.trim().length < 5) {
       errors.push('Descrição dos serviços deve conter no mínimo 5 caracteres informando a atividade prestada.');
+    }
+
+    // Regra E0370 da RFB: grupo de informações de obra é obrigatório para construção civil
+    const SUBITENS_OBRA_OBRIGATORIA = [
+      '070201', '070202', '070401', '070501', '070502',
+      '070601', '070602', '070701', '070801', '071701',
+      '071901', '141403', '141404'
+    ];
+    const cTribNacCheck = String(data.cTribNac || '').replace(/\D/g, '').slice(0, 6);
+    if (SUBITENS_OBRA_OBRIGATORIA.includes(cTribNacCheck)) {
+      const obra = data.dadosObra || data.obra || {};
+      const tipoObra = obra.tipo || data.tipoObra || (data.codigoObraCno ? 'codigo_obra' : 'codigo_obra');
+      const cObra = (obra.codigoObra || data.codigoObra || data.codigoObraCno || '').trim();
+      const cCIB = (obra.cib || data.cibObra || data.cCIB || '').trim().replace(/\D/g, '');
+      const cepObra = (obra.cep || data.cepObra || '').trim();
+
+      if (tipoObra === 'codigo_obra' && !cObra) {
+        errors.push(`O grupo de informações de obra é obrigatório para a atividade fiscal ${cTribNacCheck} (Construção Civil). Informe o Código da Obra (CNO/CEI).`);
+      } else if (tipoObra === 'cib' && (!cCIB || cCIB.length !== 8)) {
+        errors.push(`O grupo de informações de obra é obrigatório: para a opção CIB na atividade ${cTribNacCheck}, o código CIB deve conter exatamente 8 dígitos.`);
+      } else if (tipoObra === 'endereco_brasil' && (!cepObra || !(obra.logradouro || data.logradouroObra))) {
+        errors.push(`O grupo de informações de obra é obrigatório: para a opção Endereço no Brasil na atividade ${cTribNacCheck}, informe o CEP e Logradouro da obra.`);
+      } else if (!cObra && !cCIB && !cepObra && tipoObra !== 'endereco_exterior') {
+        errors.push(`O grupo de informações de obra é obrigatório para a atividade fiscal ${cTribNacCheck} (LC 116). Selecione e informe o Código de Obra (CNO), CIB ou Endereço da Obra.`);
+      }
     }
 
     return errors;

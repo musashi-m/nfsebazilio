@@ -3805,8 +3805,27 @@ const App = {
       intermNome: getVal('fIntermNome'),
       intermIm: getVal('fIntermIm'),
 
-      // 8. Construção Civil (se houver)
-      codigoObraCno: getVal('fCodigoObraCno'),
+      // 8. Construção Civil / Informações para Obra (<obra>)
+      dadosObra: this.getDadosObraPayload(),
+      tipoObra: document.querySelector('input[name="fTipoObra"]:checked')?.value || 'codigo_obra',
+      codigoObra: getVal('fObraCodigo'),
+      codigoObraCno: getVal('fObraCodigo'),
+      cibObra: getVal('fObraCib'),
+      inscImobFiscObra: getVal('fObraInscImobFisc'),
+      cepObra: getVal('fObraCep'),
+      municipioIbgeObra: getVal('fObraMunicipioIbge'),
+      bairroObra: getVal('fObraBairro'),
+      logradouroObra: getVal('fObraLogradouro'),
+      numeroObra: getVal('fObraNumero'),
+      complementoObra: getVal('fObraComplemento'),
+      cepExtObra: getVal('fObraCepExt'),
+      paisObra: getVal('fObraPaisExt'),
+      cidadeExtObra: getVal('fObraCidadeExt'),
+      estadoExtObra: getVal('fObraEstadoExt'),
+      bairroExtObra: getVal('fObraBairroExt'),
+      logradouroExtObra: getVal('fObraLogradouroExt'),
+      numeroExtObra: getVal('fObraNumeroExt'),
+      complementoExtObra: getVal('fObraComplementoExt'),
       artRegistro: getVal('fArtRegistro'),
 
       // 9. Valores do Fornecimento & Tributação Municipal
@@ -3839,6 +3858,150 @@ const App = {
       pTotTribSN: getNum('fAliquotaSimplesNacional') || 15.50,
       totTributosAprox: getNum('fAliquotaSimplesNacional') || 15.50
     };
+  },
+
+  getDadosObraPayload() {
+    const secao = document.getElementById('secaoInformacoesObra');
+    if (!secao || secao.classList.contains('hidden')) {
+      return null;
+    }
+    const getVal = id => (document.getElementById(id)?.value || '').trim();
+    const tipo = document.querySelector('input[name="fTipoObra"]:checked')?.value || 'codigo_obra';
+    const payload = {
+      tipo,
+      inscImobFisc: getVal('fObraInscImobFisc')
+    };
+
+    if (tipo === 'codigo_obra') {
+      payload.codigoObra = getVal('fObraCodigo');
+    } else if (tipo === 'cib') {
+      payload.cib = getVal('fObraCib').replace(/\D/g, '');
+    } else if (tipo === 'endereco_brasil') {
+      payload.cep = getVal('fObraCep').replace(/\D/g, '');
+      payload.municipioIbge = getVal('fObraMunicipioIbge') || getVal('fLocalPrestacaoIbge') || getVal('fMunicipioIbge');
+      payload.municipioNome = getVal('fObraMunicipioNome');
+      payload.bairro = getVal('fObraBairro');
+      payload.logradouro = getVal('fObraLogradouro');
+      payload.numero = getVal('fObraNumero');
+      payload.complemento = getVal('fObraComplemento');
+    } else if (tipo === 'endereco_exterior') {
+      payload.cep = getVal('fObraCepExt');
+      payload.pais = getVal('fObraPaisExt') || '1058';
+      payload.cidade = getVal('fObraCidadeExt');
+      payload.estado = getVal('fObraEstadoExt');
+      payload.bairro = getVal('fObraBairroExt');
+      payload.logradouro = getVal('fObraLogradouroExt');
+      payload.numero = getVal('fObraNumeroExt');
+      payload.complemento = getVal('fObraComplementoExt');
+    }
+    return payload;
+  },
+
+  handleTipoObraChange(tipo) {
+    const containers = {
+      codigo_obra: document.getElementById('containerObraCodigo'),
+      cib: document.getElementById('containerObraCib'),
+      endereco_brasil: document.getElementById('containerObraEndBrasil'),
+      endereco_exterior: document.getElementById('containerObraEndExterior')
+    };
+
+    Object.keys(containers).forEach(key => {
+      if (containers[key]) {
+        if (key === tipo) {
+          containers[key].classList.remove('hidden');
+        } else {
+          containers[key].classList.add('hidden');
+        }
+      }
+    });
+
+    if (window.lucide) lucide.createIcons();
+  },
+
+  toggleSecaoObra(show, isRequired = false) {
+    const secao = document.getElementById('secaoInformacoesObra');
+    const btnAtivar = document.getElementById('btnAtivarObraWrapper');
+    const badge = document.getElementById('badgeObraObrigatoria');
+    const btnFechar = document.getElementById('btnFecharObra');
+    if (!secao) return;
+
+    if (show) {
+      secao.classList.remove('hidden');
+      if (btnAtivar) btnAtivar.classList.add('hidden');
+      if (isRequired) {
+        if (badge) badge.classList.remove('hidden');
+        if (btnFechar) btnFechar.classList.add('hidden');
+      } else {
+        if (badge) badge.classList.add('hidden');
+        if (btnFechar) btnFechar.classList.remove('hidden');
+      }
+    } else {
+      secao.classList.add('hidden');
+      if (btnAtivar) btnAtivar.classList.remove('hidden');
+      if (badge) badge.classList.add('hidden');
+    }
+    if (window.lucide) lucide.createIcons();
+  },
+
+  verificarObrigatoriedadeObra(codigoOuSubitem) {
+    const SUBITENS_OBRA = [
+      '070201', '070202', '070401', '070501', '070502',
+      '070601', '070602', '070701', '070801', '071701',
+      '071901', '141403', '141404'
+    ];
+    const clean = String(codigoOuSubitem || '').replace(/\D/g, '').slice(0, 6);
+    if (SUBITENS_OBRA.includes(clean)) {
+      this.toggleSecaoObra(true, true);
+    } else {
+      const badge = document.getElementById('badgeObraObrigatoria');
+      const btnFechar = document.getElementById('btnFecharObra');
+      if (badge) badge.classList.add('hidden');
+      if (btnFechar) btnFechar.classList.remove('hidden');
+    }
+  },
+
+  async buscarCepObra() {
+    const cepInput = document.getElementById('fObraCep');
+    if (!cepInput) return;
+    const cleanCep = (cepInput.value || '').replace(/\D/g, '');
+    if (cleanCep.length !== 8) {
+      alert('Informe um CEP válido com 8 dígitos para consultar.');
+      cepInput.focus();
+      return;
+    }
+
+    try {
+      const resViaCep = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const dataViaCep = await resViaCep.json();
+      if (!dataViaCep.erro) {
+        if (document.getElementById('fObraLogradouro')) document.getElementById('fObraLogradouro').value = dataViaCep.logradouro || '';
+        if (document.getElementById('fObraBairro')) document.getElementById('fObraBairro').value = dataViaCep.bairro || '';
+        if (document.getElementById('fObraMunicipioNome')) document.getElementById('fObraMunicipioNome').value = `${dataViaCep.localidade} / ${dataViaCep.uf}`;
+        if (document.getElementById('fObraMunicipioIbge')) document.getElementById('fObraMunicipioIbge').value = dataViaCep.ibge || '';
+        this.showToast(`Endereço da obra preenchido via CEP (${dataViaCep.localidade}/${dataViaCep.uf})!`);
+        return;
+      }
+    } catch (e) {}
+
+    try {
+      const resBrasil = await fetch(`https://brasilapi.com.br/api/cep/v1/${cleanCep}`);
+      if (resBrasil.ok) {
+        const dataBrasil = await resBrasil.json();
+        if (document.getElementById('fObraLogradouro')) document.getElementById('fObraLogradouro').value = dataBrasil.street || '';
+        if (document.getElementById('fObraBairro')) document.getElementById('fObraBairro').value = dataBrasil.neighborhood || '';
+        if (document.getElementById('fObraMunicipioNome')) document.getElementById('fObraMunicipioNome').value = `${dataBrasil.city} / ${dataBrasil.state}`;
+        if (window.MUNICIPIOS_BRASIL && Array.isArray(window.MUNICIPIOS_BRASIL)) {
+          const matchMun = window.MUNICIPIOS_BRASIL.find(m => m.nome.toLowerCase() === dataBrasil.city.toLowerCase() && m.uf === dataBrasil.state);
+          if (matchMun && document.getElementById('fObraMunicipioIbge')) {
+            document.getElementById('fObraMunicipioIbge').value = matchMun.id;
+          }
+        }
+        this.showToast(`Endereço da obra preenchido via CEP!`);
+        return;
+      }
+    } catch (e2) {}
+
+    alert('Não foi possível localizar o endereço para o CEP da obra informado.');
   },
 
   async previewXmlDps() {
@@ -3895,13 +4058,40 @@ const App = {
   },
 
   async submitEmission() {
+    const payload = this.getEmissionPayload();
+
+    // Validação preventiva de obra para Construção Civil (LC 116 / E0370)
+    const SUBITENS_OBRA = [
+      '070201', '070202', '070401', '070501', '070502',
+      '070601', '070602', '070701', '070801', '071701',
+      '071901', '141403', '141404'
+    ];
+    const cleanCtn = String(payload.cTribNac || '').replace(/\D/g, '').slice(0, 6);
+    if (SUBITENS_OBRA.includes(cleanCtn)) {
+      const tipo = payload.tipoObra || 'codigo_obra';
+      if (tipo === 'codigo_obra' && !payload.codigoObra) {
+        alert('Atenção: Para o serviço selecionado (Construção Civil), o preenchimento do Código da Obra (CNO ou CEI) é obrigatório pela Receita Federal.');
+        this.goToEmissionStep(2);
+        document.getElementById('fObraCodigo')?.focus();
+        return;
+      } else if (tipo === 'cib' && (!payload.cibObra || payload.cibObra.length !== 8)) {
+        alert('Atenção: O Código do Cadastro Imobiliário Brasileiro (CIB) deve conter exatamente 8 dígitos.');
+        this.goToEmissionStep(2);
+        document.getElementById('fObraCib')?.focus();
+        return;
+      } else if (tipo === 'endereco_brasil' && (!payload.cepObra || !payload.logradouroObra)) {
+        alert('Atenção: Informe o CEP e Logradouro da obra.');
+        this.goToEmissionStep(2);
+        document.getElementById('fObraCep')?.focus();
+        return;
+      }
+    }
+
     const btn = document.getElementById('btnSubmitEmissao');
     if (btn) {
       btn.disabled = true;
       btn.innerHTML = `<span class="animate-spin mr-2">⏳</span> Assinando e Transmitindo para o ADN...`;
     }
-
-    const payload = this.getEmissionPayload();
 
     try {
       const res = await safeFetchJson('/api/nfse/emitir', {
@@ -4439,6 +4629,9 @@ const App = {
       badgeAliq.innerText = `Alíq. Sugerida: ${aliq}%`;
     }
 
+    // Verifica se a atividade exige informações de obra (LC 116 / E0370)
+    this.verificarObrigatoriedadeObra(cleanCode);
+
     if (updateAliq) {
       const aliqInput = document.getElementById('fAliquotaIss');
       if (aliqInput && (!aliqInput.value || parseFloat(aliqInput.value) <= 0)) {
@@ -4509,6 +4702,7 @@ const App = {
     if (badgeCode) badgeCode.innerText = customCode;
     if (badgeDesc) badgeDesc.innerText = 'Atividade Fiscal Customizada (Manual)';
     if (badgeAliq) badgeAliq.innerText = 'Alíq: Conforme Município';
+    this.verificarObrigatoriedadeObra(customCode);
   },
 
   // --- COMBOBOX DE ITENS DA NBS (NOMENCLATURA BRASILEIRA DE SERVIÇOS - OPCIONAL) ---

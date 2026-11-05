@@ -188,6 +188,95 @@ async function main() {
     assert(list.length >= 1, 'Deve listar empresas cadastradas');
   });
 
+  // 8. Construção Civil e Validação Oficial de Obra (<obra>)
+  runTest('Geração e Validação do Grupo <obra> para Construção Civil (LC 116 / E0370)', () => {
+    const certInfo = certService.activeCert;
+
+    // Caso 1: CTN 070201 sem dados de obra -> deve rejeitar
+    assert.throws(() => {
+      dpsService.buildDps({
+        prestadorCnpj: '12345678000195',
+        prestadorRazaoSocial: 'CONSTRUTORA TESTE LTDA',
+        tomadorDoc: '98765432000110',
+        tomadorNome: 'CLIENTE TOMADOR S/A',
+        descricaoServico: 'Execução de obras de alvenaria e reforma estrutural',
+        valorServico: 5000.00,
+        aliquotaIss: 2.0,
+        cTribNac: '070201'
+      }, certInfo, 1);
+    }, /informações de obra é obrigatório/, 'Deve rejeitar CTN de obra sem dados de obra');
+
+    // Caso 2: Opção Código da Obra (CNO / CEI)
+    const dpsObra1 = dpsService.buildDps({
+      prestadorCnpj: '12345678000195',
+      prestadorRazaoSocial: 'CONSTRUTORA TESTE LTDA',
+      tomadorDoc: '98765432000110',
+      tomadorNome: 'CLIENTE TOMADOR S/A',
+      descricaoServico: 'Execução de obras de alvenaria e reforma estrutural',
+      valorServico: 5000.00,
+      aliquotaIss: 2.0,
+      cTribNac: '070201',
+      dadosObra: {
+        tipo: 'codigo_obra',
+        codigoObra: '900012345678',
+        inscImobFisc: 'IPTU-1234'
+      }
+    }, certInfo, 1);
+
+    assert(dpsObra1.xml.includes('<obra>'), 'Deve conter tag <obra>');
+    assert(dpsObra1.xml.includes('<inscImobFisc>IPTU-1234</inscImobFisc>'), 'Deve conter inscrição imobiliária fiscal');
+    assert(dpsObra1.xml.includes('<cObra>900012345678</cObra>'), 'Deve conter código da obra CNO/CEI');
+
+    // Caso 3: Opção CIB (Cadastro Imobiliário Brasileiro)
+    const dpsObra2 = dpsService.buildDps({
+      prestadorCnpj: '12345678000195',
+      prestadorRazaoSocial: 'CONSTRUTORA TESTE LTDA',
+      tomadorDoc: '98765432000110',
+      tomadorNome: 'CLIENTE TOMADOR S/A',
+      descricaoServico: 'Execução de fundações e terraplanagem',
+      valorServico: 12000.00,
+      aliquotaIss: 2.0,
+      cTribNac: '070201',
+      dadosObra: {
+        tipo: 'cib',
+        cib: '12345678'
+      }
+    }, certInfo, 1);
+
+    assert(dpsObra2.xml.includes('<obra>'), 'Deve conter tag <obra>');
+    assert(dpsObra2.xml.includes('<cCIB>12345678</cCIB>'), 'Deve conter tag <cCIB> com 8 caracteres');
+
+    // Caso 4: Opção Endereço no Brasil
+    const dpsObra3 = dpsService.buildDps({
+      prestadorCnpj: '12345678000195',
+      prestadorRazaoSocial: 'CONSTRUTORA TESTE LTDA',
+      tomadorDoc: '98765432000110',
+      tomadorNome: 'CLIENTE TOMADOR S/A',
+      descricaoServico: 'Reforma de prédio comercial',
+      valorServico: 8000.00,
+      aliquotaIss: 2.0,
+      cTribNac: '070201',
+      dadosObra: {
+        tipo: 'endereco_brasil',
+        cep: '49000000',
+        municipioIbge: '2800308',
+        logradouro: 'Av. Beira Mar',
+        numero: '1500',
+        bairro: '13 de Julho',
+        complemento: 'Bloco B'
+      }
+    }, certInfo, 1);
+
+    assert(dpsObra3.xml.includes('<obra>'), 'Deve conter tag <obra>');
+    assert(dpsObra3.xml.includes('<endNac>'), 'Deve conter tag <endNac>');
+    assert(dpsObra3.xml.includes('<cMun>2800308</cMun>'), 'Deve conter cMun correto');
+    assert(dpsObra3.xml.includes('<CEP>49000000</CEP>'), 'Deve conter CEP');
+    assert(dpsObra3.xml.includes('<xLgr>Av. Beira Mar</xLgr>'), 'Deve conter xLgr');
+    assert(dpsObra3.xml.includes('<nro>1500</nro>'), 'Deve conter nro');
+    assert(dpsObra3.xml.includes('<xCpl>Bloco B</xCpl>'), 'Deve conter xCpl');
+    assert(dpsObra3.xml.includes('<xBairro>13 de Julho</xBairro>'), 'Deve conter xBairro');
+  });
+
   // Limpa o certificado de teste após os testes
   certService.clearCert();
 
