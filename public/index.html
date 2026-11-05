@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emissor Nacional de Notas Fiscais (NFS-e ADN / RFB)</title>
+  <!-- Favicon e Ícones da Janela do Navegador -->
+  <link rel="icon" type="image/png" href="img/logo.png">
+  <link rel="shortcut icon" href="favicon.ico">
+  <link rel="apple-touch-icon" href="img/logo.png">
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons CDN -->
@@ -48,10 +52,8 @@
   <header class="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-40 shadow-md">
     <div class="max-w-[1720px] 2xl:max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       <!-- Logo e Título -->
-      <div class="flex items-center space-x-3 cursor-pointer" onclick="App.switchTab('dashboard')">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-emerald-500 flex items-center justify-center shadow-inner font-black text-lg text-white">
-          N
-        </div>
+      <div class="flex items-center space-x-3 cursor-pointer select-none" onclick="App.switchTab('dashboard')">
+        <img src="img/logo.png" alt="Logo Emissor Nacional" class="w-10 h-10 object-contain drop-shadow-md rounded-xl hover:scale-105 transition-transform">
         <div>
           <div class="flex items-center space-x-2">
             <span class="font-extrabold text-base tracking-tight text-white">EMISSOR NACIONAL</span>
