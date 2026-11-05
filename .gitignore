@@ -29,6 +29,8 @@ data/settings.json
 
 # Arquivos temporários do SO
 cloudflared.exe
+fly.exe
+flyctl.exe
 .DS_Store
 Thumbs.db
 .vscode/
