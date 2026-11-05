@@ -83,7 +83,22 @@ class AdnService {
       });
     }
 
-    // 3. Construção do XML da DPS com os dados do Prestador Representado e Procurador
+    // 3. Validação e resolução rigorosa do Município IBGE do Tomador com base no CEP (evita E0240 da SEFIN)
+    if (dpsInput.tomadorCep) {
+      const cleanCep = String(dpsInput.tomadorCep).replace(/\D/g, '');
+      if (cleanCep.length === 8) {
+        try {
+          const viaCepRes = await axios.get(`https://viacep.com.br/ws/${cleanCep}/json/`, { timeout: 3500 });
+          if (viaCepRes.data && viaCepRes.data.ibge) {
+            dpsInput.tomadorMunIbge = viaCepRes.data.ibge;
+            if (viaCepRes.data.localidade) dpsInput.tomadorMunicipio = viaCepRes.data.localidade;
+            if (viaCepRes.data.uf) dpsInput.tomadorUf = viaCepRes.data.uf;
+          }
+        } catch (_) {}
+      }
+    }
+
+    // 4. Construção do XML da DPS com os dados do Prestador Representado e Procurador
     const dpsResult = dpsService.buildDps(dpsInput, certInfo, env.tpAmb);
 
     // 4. Assinatura Digital ICP-Brasil (XMLDSig RSA-SHA256)

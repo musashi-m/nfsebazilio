@@ -1620,6 +1620,11 @@ const App = {
         if (bairroId) setV(bairroId, data2.bairro);
         if (munId) setV(munId, data2.localidade);
         if (ufId) setV(ufId, data2.uf);
+        if (data2.ibge) {
+          setV('fTomadorMunIbge', data2.ibge);
+          const tomDoc = document.getElementById('fTomadorDoc');
+          if (tomDoc) tomDoc.dataset.municipioIbge = data2.ibge;
+        }
         this.showToast(`Endereço carregado via ViaCEP!`);
       } catch (err2) {
         alert('Não foi possível localizar o endereço para o CEP informado.');
@@ -3797,7 +3802,7 @@ const App = {
       tomadorBairro: getVal('fTomadorBairro'),
       tomadorMunicipio: getVal('fTomadorMunicipio'),
       tomadorUf: getVal('fTomadorUf') || 'SE',
-      tomadorMunIbge: document.getElementById('fTomadorDoc')?.dataset?.municipioIbge || getVal('fMunicipioIbge') || '2800308',
+      tomadorMunIbge: getVal('fTomadorMunIbge') || document.getElementById('fTomadorDoc')?.dataset?.municipioIbge || (getVal('fTomadorUf') === 'SE' ? '2800308' : (getVal('fMunicipioIbge') || '2800308')),
 
       // 4. Local da Prestação
       localPrestacaoIbge: getVal('fLocalPrestacaoIbge') || getVal('fMunicipioIbge') || '2800308',
@@ -5146,6 +5151,11 @@ const App = {
         setVal('fTomadorBairro', res.bairro);
         setVal('fTomadorMunicipio', res.localidade);
         setVal('fTomadorUf', res.uf);
+        if (res.ibge) {
+          setVal('fTomadorMunIbge', res.ibge);
+          const tomDoc = document.getElementById('fTomadorDoc');
+          if (tomDoc) tomDoc.dataset.municipioIbge = res.ibge;
+        }
       }
     } catch (e) {
       console.warn('Erro ao consultar CEP:', e);

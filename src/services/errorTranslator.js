@@ -165,7 +165,19 @@ const ERROR_DICTIONARY = [
     severity: 'warning'
   },
   {
-    regex: /(tomador|toma\.cnpj|toma\.cpf|documento do tomador inv[aá]lido|E045)/i,
+    regex: /(E0240|CEP.*n[aã]o pertence ao munic[ií]pio|CEP.*endere[cç]o.*tomador)/i,
+    category: 'Endereço do Tomador (CEP / Município)',
+    title: 'Divergência entre CEP e Município do Tomador',
+    friendlyMessage: 'O CEP informado para o tomador não pertence ao município indicado na DPS (ou o código IBGE do município não corresponde à faixa de CEP).',
+    howToFix: [
+      'Confira o CEP do tomador do serviço.',
+      'O sistema agora sincroniza e corrige automaticamente o código IBGE do município a partir do CEP informado.',
+      'Ao alterar o CEP do tomador, utilize a busca de CEP (ícone de lupa) para atualizar o município e o código IBGE.'
+    ],
+    severity: 'error'
+  },
+  {
+    regex: /(toma\.cnpj|toma\.cpf|cpf.*tomador.*inv[aá]lido|cnpj.*tomador.*inv[aá]lido|documento do tomador inv[aá]lido|E045)/i,
     category: 'Dados do Tomador',
     title: 'Documento do Tomador Inválido',
     friendlyMessage: 'O CPF ou CNPJ informado para o tomador (cliente) possui dígitos verificadores incorretos ou formatação inválida.',
