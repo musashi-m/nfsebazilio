@@ -61,13 +61,13 @@ body {
   }
 }
 
-/* Estilos Oficiais do DANFSE Nacional v2.0 */
+/* Estilos Oficiais do DANFSE Nacional v2.0 (Réplica RFB / CGNFS-e) */
 .danfse-page-container {
   width: 100%;
   max-width: 210mm;
   background-color: #ffffff !important;
   color: #000000 !important;
-  padding: 3mm 4mm;
+  padding: 4mm 5mm;
   box-sizing: border-box;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   font-family: Arial, Helvetica, sans-serif;
@@ -85,13 +85,8 @@ html.dark .danfse-page-container {
   background-color: #ffffff !important;
 }
 
-html.dark .danfse-bg-gray,
-html.dark .danfse-sec-title,
-html.dark .danfse-bar-neutral {
-  background-color: #f2f2f2 !important;
-}
-
 .danfse-document {
+  border: 1px solid #000000 !important;
   width: 100%;
   background: #ffffff !important;
   color: #000000 !important;
@@ -107,53 +102,63 @@ html.dark .danfse-bar-neutral {
 
 .danfse-table td,
 .danfse-table th {
-  border: 1px solid #000000 !important;
   padding: 1.5px 3.5px;
   vertical-align: top;
-  word-break: break-word;
-  font-size: 7.5pt;
+  font-size: 7.2pt;
   line-height: 1.15;
+  word-break: break-word;
+  border: none !important; /* Sem linhas de grade entre as informações */
   background-color: #ffffff;
 }
 
-.danfse-bg-gray {
-  background-color: #f2f2f2 !important;
+/* Linha divisória horizontal entre seções */
+.danfse-sec-divider td {
+  border-top: 1px solid #000000 !important;
+}
+
+/* Divisores verticais no cabeçalho e canhoto */
+.danfse-border-right {
+  border-right: 1px solid #000000 !important;
+}
+
+.danfse-border-left {
+  border-left: 1px solid #000000 !important;
 }
 
 .danfse-title-main {
-  font-size: 13pt;
+  font-size: 12pt;
   font-weight: bold;
   line-height: 1.1;
   color: #000000 !important;
 }
 
 .danfse-title-sub {
-  font-size: 9.5pt;
+  font-size: 9pt;
   line-height: 1.1;
   color: #000000 !important;
 }
 
 .danfse-chave-num {
-  font-size: 9.2pt;
+  font-size: 9pt;
   font-weight: bold;
-  font-family: monospace, Arial, sans-serif;
-  letter-spacing: 0.5px;
+  font-family: Arial, sans-serif;
+  letter-spacing: 0.3px;
   color: #000000 !important;
 }
 
 .danfse-lbl {
   display: block;
-  font-size: 6.5pt;
+  font-size: 5.5pt;
   font-weight: bold;
   text-transform: uppercase;
-  color: #111111 !important;
+  color: #000000 !important;
   line-height: 1.1;
   margin-bottom: 0.5px;
 }
 
 .danfse-val {
   display: block;
-  font-size: 7.5pt;
+  font-size: 7.2pt;
   color: #000000 !important;
   line-height: 1.15;
 }
@@ -166,50 +171,42 @@ html.dark .danfse-bar-neutral {
   font-size: 6.5pt;
   font-weight: bold;
   text-transform: uppercase;
-  background-color: #f2f2f2 !important;
   color: #000000 !important;
-  display: flex;
-  align-items: center;
-  height: 100%;
 }
 
 .danfse-bar-neutral {
   text-align: center;
   font-weight: bold;
   font-size: 6pt;
-  background-color: #f2f2f2 !important;
-  color: #000000 !important;
-  padding: 2.5px 2px;
+  padding: 2.5px 0;
   text-transform: uppercase;
+  border-top: 1px solid #000000 !important;
+  color: #000000 !important;
 }
 
 .danfse-qr-text {
-  font-size: 5pt;
+  font-size: 4.8pt;
   line-height: 1.05;
   color: #222222 !important;
   margin-top: 1px;
 }
 
 .danfse-desc-ctn {
-  font-size: 6.2pt;
-  color: #222222 !important;
+  font-size: 6pt;
+  color: #111111 !important;
   line-height: 1.15;
 }
 
 .danfse-desc-serv {
   white-space: pre-wrap;
-  font-size: 7pt;
-  line-height: 1.25;
-  padding-top: 1px;
+  font-size: 6.8pt;
+  line-height: 1.2;
   font-family: Arial, Helvetica, sans-serif;
   color: #000000 !important;
 }
 
-.danfse-info-box {
-  min-height: 140px;
-  height: 140px;
-  vertical-align: top !important;
-  padding: 4px;
+.danfse-spacer {
+  height: 100px;
 }
 
 .danfse-watermark {
@@ -229,48 +226,56 @@ html.dark .danfse-bar-neutral {
   z-index: 20;
 }
 
-/* Estilos de Impressão do DANFSE Nacional */
+/* ========================================================
+   ESTILOS DE IMPRESSÃO - EXATAMENTE 1 PÁGINA A4 SEM BRANCO
+   ======================================================== */
 @media print {
   @page {
     size: A4 portrait;
-    margin: 4mm;
+    margin: 4mm 5mm;
   }
 
   html, body {
-    background: #ffffff !important;
-    color: #000000 !important;
     margin: 0 !important;
     padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
   }
 
-  body * {
-    visibility: hidden;
+  /* Desativa do fluxo de impressão todos os nós fora do modal */
+  body > *:not(#danfseModal) {
+    display: none !important;
   }
 
-  #danfseModal,
-  #danfseModal * {
-    visibility: visible;
+  #app, header, footer, aside, nav, .sidebar {
+    display: none !important;
   }
 
   #danfseModal {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+    position: static !important;
+    display: block !important;
     width: 100% !important;
     height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
-    background: #ffffff !important;
-    display: block !important;
+    background: transparent !important;
+    overflow: visible !important;
+    z-index: auto !important;
   }
 
   #danfseModal > div {
     max-width: 100% !important;
+    width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
     box-shadow: none !important;
     border: none !important;
-    background: #ffffff !important;
+    background: transparent !important;
+    max-height: none !important;
+    overflow: visible !important;
   }
 
   #danfsePrintArea {
@@ -278,19 +283,29 @@ html.dark .danfse-bar-neutral {
     margin: 0 !important;
     background: #ffffff !important;
     width: 100% !important;
+    overflow: visible !important;
   }
 
   .danfse-page-container {
     box-shadow: none !important;
     padding: 0 !important;
-    margin: 0 auto !important;
+    margin: 0 !important;
     max-width: 100% !important;
     width: 100% !important;
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   .danfse-document {
-    page-break-inside: avoid;
-    break-inside: avoid;
+    border: 1px solid #000000 !important;
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .danfse-spacer {
+    height: 70px !important;
   }
 
   .no-print {
