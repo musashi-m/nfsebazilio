@@ -149,19 +149,17 @@ class DpsService {
           xmlEscolhaObra = `\n        <cCIB>${this.escapeXml(cCIB)}</cCIB>`;
         }
       } else if (tipoObra === 'endereco_brasil' || (!cObra && !cCIB && (obra.cep || data.cepObra))) {
-        const cMunObra = String(obra.municipioIbge || data.municipioIbgeObra || data.localPrestacaoIbge || cLocPrestacao).padStart(7, '0').slice(-7);
         const cepObra = String(obra.cep || data.cepObra || '').replace(/\D/g, '').padStart(8, '0').slice(-8);
         const lgrObra = obra.logradouro || data.logradouroObra || 'NAO INFORMADO';
         const nroObra = obra.numero || data.numeroObra || 'S/N';
         const cplObra = obra.complemento || data.complementoObra || '';
         const bairroObra = obra.bairro || data.bairroObra || 'CENTRO';
 
+        // Conforme Schema oficial SEFIN (TCEnderecoSimples):
+        // O elemento <end> recebe diretamente <CEP>, <xLgr>, <nro>, <xCpl>, <xBairro>
         xmlEscolhaObra = `
         <end>
-          <endNac>
-            <cMun>${cMunObra}</cMun>
-            <CEP>${cepObra}</CEP>
-          </endNac>
+          <CEP>${cepObra}</CEP>
           <xLgr>${this.escapeXml(lgrObra)}</xLgr>
           <nro>${this.escapeXml(nroObra)}</nro>${cplObra ? `\n          <xCpl>${this.escapeXml(cplObra)}</xCpl>` : ''}
           <xBairro>${this.escapeXml(bairroObra)}</xBairro>

@@ -268,8 +268,7 @@ async function main() {
     }, certInfo, 1);
 
     assert(dpsObra3.xml.includes('<obra>'), 'Deve conter tag <obra>');
-    assert(dpsObra3.xml.includes('<endNac>'), 'Deve conter tag <endNac>');
-    assert(dpsObra3.xml.includes('<cMun>2800308</cMun>'), 'Deve conter cMun correto');
+    assert(dpsObra3.xml.includes('<end>'), 'Deve conter tag <end>');
     assert(dpsObra3.xml.includes('<CEP>49000000</CEP>'), 'Deve conter CEP');
     assert(dpsObra3.xml.includes('<xLgr>Av. Beira Mar</xLgr>'), 'Deve conter xLgr');
     assert(dpsObra3.xml.includes('<nro>1500</nro>'), 'Deve conter nro');
