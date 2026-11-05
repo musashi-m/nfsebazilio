@@ -111,14 +111,14 @@
           <span class="sidebar-label">Visão Geral</span>
         </button>
 
-        <button data-nav-tab="emissao" class="sidebar-nav-btn w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all text-left" title="Nova Emissão (DPS)">
+        <button data-nav-tab="emissao" class="sidebar-nav-btn w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all text-left" title="Emitir NFSe">
           <i data-lucide="file-plus-2" class="w-4 h-4 text-emerald-600 shrink-0"></i>
-          <span class="sidebar-label">Nova Emissão (DPS)</span>
+          <span class="sidebar-label">Emitir NFSe</span>
         </button>
 
-        <button data-nav-tab="historico" class="sidebar-nav-btn w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all text-left" title="Histórico ADN">
+        <button data-nav-tab="historico" class="sidebar-nav-btn w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all text-left" title="Consultar NFSe">
           <i data-lucide="database" class="w-4 h-4 text-brand-600 shrink-0"></i>
-          <span class="sidebar-label">Histórico ADN</span>
+          <span class="sidebar-label">Consultar NFSe</span>
         </button>
 
         <button data-nav-tab="certificado" class="sidebar-nav-btn w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all text-left" title="Certificado Digital">
@@ -269,121 +269,241 @@
       </section>
 
       <!-- ========================================== -->
-      <!-- PAINEL 2: EMISSÃO COMPLETA DE NFS-E NACIONAL -->
+      <!-- PAINEL 2: EMISSÃO DE NFS-E (PADRÃO NACIONAL) -->
       <!-- ========================================== -->
       <section id="panel-emissao" class="tab-content-panel hidden space-y-6">
-        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 space-y-6">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-2">
-            <div>
-              <div class="flex items-center space-x-2">
-                <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold uppercase">Padrão Nacional CGNFS-e</span>
-                <h2 class="text-lg font-bold text-slate-900">Emissão Completa de NFS-e Nacional (DPS v1.00)</h2>
-              </div>
-              <p class="text-xs text-slate-500 mt-0.5">Preenchimento oficial com todas as seções cadastrais e tributárias da Receita Federal</p>
-            </div>
-            <div class="flex items-center space-x-2">
-              <button type="button" onclick="App.previewXmlDps()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-colors flex items-center space-x-1.5 border border-slate-200">
-                <i data-lucide="code" class="w-3.5 h-3.5"></i>
-                <span>Ver XML da DPS</span>
-              </button>
-            </div>
-          </div>
 
-          <!-- BLOCO: CARREGAR DADOS DE UMA NOTA ANTERIOR -->
-          <div class="bg-slate-50/80 p-5 rounded-2xl border border-slate-200/90 space-y-4 shadow-sm">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200/70 pb-3 gap-2">
-              <div class="flex items-center space-x-2.5">
-                <div class="w-8 h-8 rounded-xl bg-emerald-600/10 text-emerald-600 flex items-center justify-center font-bold">
-                  <i data-lucide="copy" class="w-4 h-4"></i>
+        <!-- ========================================================== -->
+        <!-- PÁGINA 1: PONTO DE PARTIDA / ESCOLHA DO MODO DE EMISSÃO     -->
+        <!-- ========================================================== -->
+        <div id="emissionChoiceView" class="space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 sm:p-8 space-y-6">
+            
+            <!-- Cabeçalho de Boas-Vindas da Emissão -->
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between pb-6 border-b border-slate-100 gap-4">
+              <div>
+                <div class="flex items-center space-x-2">
+                  <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold uppercase tracking-wider">Padrão Nacional CGNFS-e</span>
+                  <span class="text-xs text-slate-400">•</span>
+                  <span class="text-xs text-slate-500 font-medium">DPS v1.00 Oficial</span>
                 </div>
-                <div>
-                  <h3 class="text-sm font-bold text-slate-800">Carregar dados de uma nota anterior</h3>
-                  <p class="text-[11px] text-slate-500">Reaproveite as informações de uma NFS-e já emitida para acelerar o preenchimento</p>
-                </div>
+                <h2 class="text-2xl font-black text-slate-900 tracking-tight mt-1">Como você deseja emitir esta NFS-e?</h2>
+                <p class="text-xs text-slate-500 mt-1">Escolha abaixo o ponto de partida para preparar os dados da sua nota fiscal:</p>
               </div>
-              <div class="flex items-center space-x-2">
-                <span class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200/80 flex items-center space-x-1.5" title="Acervo vinculado à empresa representada ativa">
-                  <i data-lucide="building-2" class="w-3.5 h-3.5 text-emerald-600"></i>
-                  <span id="loadPreviousNoteActiveCompanyName">Selecionar Representada...</span>
-                </span>
+
+              <!-- Indicador da Empresa Emitente Ativa -->
+              <div class="flex items-center space-x-3 bg-slate-50 border border-slate-200/80 px-4 py-2.5 rounded-2xl shrink-0">
+                <div class="w-9 h-9 rounded-xl bg-emerald-600/10 text-emerald-700 flex items-center justify-center font-bold shrink-0">
+                  <i data-lucide="building-2" class="w-5 h-5 text-emerald-600"></i>
+                </div>
+                <div class="min-w-0 pr-1">
+                  <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Empresa Emitente</span>
+                  <div id="loadPreviousNoteActiveCompanyName" class="text-xs font-bold text-slate-800 truncate max-w-[220px]" title="Empresa Ativa">Selecionar Representada...</div>
+                </div>
+                <button type="button" onclick="App.openRepresentationModal()" class="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl border border-slate-200 shadow-2xs transition-colors flex items-center space-x-1 shrink-0" title="Trocar a empresa representada ativa">
+                  <i data-lucide="repeat" class="w-3.5 h-3.5 text-slate-500"></i>
+                  <span>Trocar</span>
+                </button>
               </div>
             </div>
 
-            <!-- 3 Colunas de Busca/Carregamento -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
-              
-              <!-- Coluna 1: Última NFS-e emitida -->
-              <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-3">
-                <div>
-                  <h4 class="text-xs font-bold text-slate-800 mb-1 flex items-center space-x-1.5">
-                    <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500"></i>
-                    <span>Última NFS-e emitida</span>
-                  </h4>
-                  <p class="text-[11px] text-slate-500 leading-relaxed">Carrega todos os dados da nota mais recente emitida por este CNPJ.</p>
-                </div>
-                <div>
-                  <button type="button" onclick="App.carregarUltimaNfseEmitida()" id="btnCarregarUltimaNfse" class="w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 font-semibold text-xs rounded-xl border border-slate-300 shadow-sm transition-all flex items-center justify-center space-x-1.5 active:scale-95">
-                    <i data-lucide="history" class="w-3.5 h-3.5 text-emerald-600"></i>
-                    <span>Carregar</span>
-                  </button>
+            <!-- Grade das 3 Opções de Início -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2">
+
+              <!-- OPÇÃO 1: Emitir com Base em Nota Anterior -->
+              <div class="bg-gradient-to-b from-emerald-50/40 via-white to-white p-6 rounded-2xl border-2 border-emerald-300 hover:border-emerald-500 transition-all shadow-sm hover:shadow-md flex flex-col justify-between space-y-6">
+                <div class="space-y-4">
+                  <div class="flex items-center justify-between">
+                    <div class="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
+                      <i data-lucide="history" class="w-6 h-6"></i>
+                    </div>
+                    <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold uppercase">Mais Rápido</span>
+                  </div>
+                  <div>
+                    <h3 class="text-base font-bold text-slate-900">Com base em nota anterior</h3>
+                    <p class="text-xs text-slate-500 mt-1 leading-relaxed">Reaproveite dados de uma nota já autorizada pelo ADN para economizar tempo.</p>
+                  </div>
+
+                  <!-- 3 Formas de Buscar a Nota Anterior -->
+                  <div class="space-y-3 pt-1">
+                    
+                    <!-- 1.1 Última NFS-e Emitida -->
+                    <div class="p-3.5 rounded-xl bg-white border border-slate-200/90 shadow-2xs space-y-2">
+                      <div class="flex items-center space-x-1.5 text-xs font-bold text-slate-800">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500"></i>
+                        <span>Última NFS-e emitida</span>
+                      </div>
+                      <p class="text-[11px] text-slate-500 leading-normal">Puxa automaticamente todos os dados da nota mais recente emitida.</p>
+                      <button type="button" onclick="App.carregarUltimaNfseEmitida()" id="btnCarregarUltimaNfse" class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center space-x-1.5 active:scale-95">
+                        <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+                        <span>Carregar e Preencher</span>
+                      </button>
+                    </div>
+
+                    <!-- 1.2 Por Número da NFS-e -->
+                    <div class="p-3.5 rounded-xl bg-white border border-slate-200/90 shadow-2xs space-y-2">
+                      <div class="flex items-center space-x-1.5 text-xs font-bold text-slate-800">
+                        <i data-lucide="hash" class="w-3.5 h-3.5 text-brand-600"></i>
+                        <span>Por número da NFS-e</span>
+                      </div>
+                      <div class="grid grid-cols-3 gap-2">
+                        <div class="col-span-1">
+                          <label class="block text-[9px] font-bold text-slate-500 uppercase mb-0.5">Ano</label>
+                          <select id="loadPrevNfseAno" class="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-xs font-bold bg-white text-slate-800 outline-none focus:ring-1 focus:ring-emerald-500">
+                            <option value="2026" selected>2026</option>
+                            <option value="2025">2025</option>
+                            <option value="2024">2024</option>
+                            <option value="2023">2023</option>
+                            <option value="">Todos</option>
+                          </select>
+                        </div>
+                        <div class="col-span-2">
+                          <label class="block text-[9px] font-bold text-slate-500 uppercase mb-0.5">Número</label>
+                          <input type="text" id="loadPrevNfseNumero" placeholder="Ex: 20260000000923" onkeydown="if(event.key==='Enter'){event.preventDefault();App.carregarNfsePorNumero();}" class="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-xs font-mono bg-white text-slate-800 outline-none focus:ring-1 focus:ring-emerald-500">
+                        </div>
+                      </div>
+                      <button type="button" onclick="App.carregarNfsePorNumero()" id="btnCarregarPorNumero" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs rounded-xl border border-slate-300 transition-all flex items-center justify-center space-x-1.5 active:scale-95">
+                        <i data-lucide="file-search" class="w-3.5 h-3.5 text-brand-600"></i>
+                        <span>Buscar e Preencher</span>
+                      </button>
+                    </div>
+
+                    <!-- 1.3 Por Documento do Tomador -->
+                    <div class="p-3.5 rounded-xl bg-white border border-slate-200/90 shadow-2xs space-y-2">
+                      <div class="flex items-center space-x-1.5 text-xs font-bold text-slate-800">
+                        <i data-lucide="user" class="w-3.5 h-3.5 text-blue-600"></i>
+                        <span>Por CPF/CNPJ do Tomador</span>
+                      </div>
+                      <input type="text" id="loadPrevTomadorDoc" placeholder="CPF ou CNPJ do Cliente" onkeydown="if(event.key==='Enter'){event.preventDefault();App.carregarNfsePorTomador();}" class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-mono bg-white text-slate-800 outline-none focus:ring-1 focus:ring-emerald-500">
+                      <button type="button" onclick="App.carregarNfsePorTomador()" id="btnCarregarPorTomador" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs rounded-xl border border-slate-300 transition-all flex items-center justify-center space-x-1.5 active:scale-95">
+                        <i data-lucide="user-check" class="w-3.5 h-3.5 text-blue-600"></i>
+                        <span>Buscar e Preencher</span>
+                      </button>
+                    </div>
+
+                  </div>
                 </div>
               </div>
 
-              <!-- Coluna 2: Por número da NFS-e -->
-              <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-3">
-                <div>
-                  <h4 class="text-xs font-bold text-slate-800 mb-1 flex items-center space-x-1.5">
-                    <i data-lucide="hash" class="w-3.5 h-3.5 text-brand-500"></i>
-                    <span>Por número da NFS-e</span>
-                  </h4>
-                  <div class="grid grid-cols-3 gap-2 pt-1">
-                    <div class="col-span-1">
-                      <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Ano</label>
-                      <select id="loadPrevNfseAno" class="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-xs font-bold bg-white text-slate-800 outline-none focus:ring-1 focus:ring-emerald-500">
-                        <option value="2026" selected>2026</option>
-                        <option value="2025">2025</option>
-                        <option value="2024">2024</option>
-                        <option value="2023">2023</option>
-                        <option value="">Todos</option>
+              <!-- OPÇÃO 2: Utilizar Modelo Pronto (Template) -->
+              <div class="bg-gradient-to-b from-brand-50/40 via-white to-white p-6 rounded-2xl border-2 border-brand-200 hover:border-brand-400 transition-all shadow-sm hover:shadow-md flex flex-col justify-between space-y-6">
+                <div class="space-y-4">
+                  <div class="flex items-center justify-between">
+                    <div class="w-12 h-12 rounded-2xl bg-brand-600 text-white flex items-center justify-center shadow-sm">
+                      <i data-lucide="layout-template" class="w-6 h-6"></i>
+                    </div>
+                    <span class="px-2.5 py-0.5 rounded-full bg-brand-100 text-brand-800 text-[10px] font-bold uppercase">Templates</span>
+                  </div>
+                  <div>
+                    <h3 class="text-base font-bold text-slate-900">Usar modelo pronto</h3>
+                    <p class="text-xs text-slate-500 mt-1 leading-relaxed">Aplique modelos frequentes de serviço e tributação salvos para esta empresa.</p>
+                  </div>
+
+                  <div class="space-y-4 pt-2">
+                    <div>
+                      <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1.5">Selecione o Modelo Salvo</label>
+                      <select id="selectEmissionTemplate" onchange="App.handleTemplateSelectChange(this.value)" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-xs font-semibold bg-white text-slate-800 outline-none focus:ring-2 focus:ring-brand-500">
+                        <option value="">Nenhum modelo selecionado (Preenchimento manual)</option>
+                        <!-- Populado dinamicamente -->
                       </select>
                     </div>
-                    <div class="col-span-2">
-                      <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Número</label>
-                      <input type="text" id="loadPrevNfseNumero" placeholder="Número completo (13/15 dígitos)" onkeydown="if(event.key==='Enter'){event.preventDefault();App.carregarNfsePorNumero();}" class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-mono bg-white text-slate-800 outline-none focus:ring-1 focus:ring-emerald-500">
+
+                    <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-600 space-y-2">
+                      <div class="font-bold text-slate-800 flex items-center space-x-1.5">
+                        <i data-lucide="info" class="w-3.5 h-3.5 text-brand-600"></i>
+                        <span>Vantagens dos Modelos:</span>
+                      </div>
+                      <p class="text-[11px] text-slate-500 leading-relaxed">O modelo preenche automaticamente a descrição do serviço, códigos fiscais (LC 116 e NBS) e alíquotas de tributação, bastando preencher o tomador.</p>
                     </div>
                   </div>
                 </div>
-                <div>
-                  <button type="button" onclick="App.carregarNfsePorNumero()" id="btnCarregarPorNumero" class="w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 font-semibold text-xs rounded-xl border border-slate-300 shadow-sm transition-all flex items-center justify-center space-x-1.5 active:scale-95">
-                    <i data-lucide="file-search" class="w-3.5 h-3.5 text-brand-600"></i>
-                    <span>Carregar</span>
+
+                <div class="space-y-2 pt-4 border-t border-slate-100">
+                  <button type="button" onclick="App.aplicarModeloSelecionado()" id="btnAplicarModelo" class="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center space-x-1.5 active:scale-95">
+                    <i data-lucide="wand-2" class="w-4 h-4"></i>
+                    <span>Aplicar Modelo e Preencher</span>
+                  </button>
+                  <button type="button" onclick="App.openManageTemplatesModal()" class="w-full py-2 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl border border-slate-200 transition-all flex items-center justify-center space-x-1.5">
+                    <i data-lucide="settings-2" class="w-3.5 h-3.5 text-slate-500"></i>
+                    <span>Gerenciar Modelos Cadastrados</span>
                   </button>
                 </div>
               </div>
 
-              <!-- Coluna 3: Por documento do tomador -->
-              <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-3">
-                <div>
-                  <h4 class="text-xs font-bold text-slate-800 mb-1 flex items-center space-x-1.5">
-                    <i data-lucide="user" class="w-3.5 h-3.5 text-blue-500"></i>
-                    <span>Por documento do tomador</span>
-                  </h4>
-                  <div class="pt-1">
-                    <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">CPF ou CNPJ do Tomador</label>
-                    <input type="text" id="loadPrevTomadorDoc" placeholder="CPF ou CNPJ do Tomador" onkeydown="if(event.key==='Enter'){event.preventDefault();App.carregarNfsePorTomador();}" class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-mono bg-white text-slate-800 outline-none focus:ring-1 focus:ring-emerald-500">
+              <!-- OPÇÃO 3: Emitir Nota do Zero -->
+              <div class="bg-gradient-to-b from-slate-50/60 via-white to-white p-6 rounded-2xl border-2 border-slate-300 hover:border-slate-500 transition-all shadow-sm hover:shadow-md flex flex-col justify-between space-y-6">
+                <div class="space-y-4">
+                  <div class="flex items-center justify-between">
+                    <div class="w-12 h-12 rounded-2xl bg-slate-800 text-white flex items-center justify-center shadow-sm">
+                      <i data-lucide="file-plus-2" class="w-6 h-6"></i>
+                    </div>
+                    <span class="px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-800 text-[10px] font-bold uppercase">Formulário Limpo</span>
+                  </div>
+                  <div>
+                    <h3 class="text-base font-bold text-slate-900">Emitir nota do zero</h3>
+                    <p class="text-xs text-slate-500 mt-1 leading-relaxed">Formulário em branco para preenchimento manual completo de todas as seções cadastrais e fiscais.</p>
+                  </div>
+
+                  <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-600 space-y-2 mt-2">
+                    <div class="font-bold text-slate-800 flex items-center space-x-1.5">
+                      <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600"></i>
+                      <span>Quando utilizar:</span>
+                    </div>
+                    <ul class="space-y-1.5 text-[11px] text-slate-600 list-disc list-inside leading-relaxed">
+                      <li>Primeira emissão para um novo cliente;</li>
+                      <li>Serviços eventuais com discriminação única;</li>
+                      <li>Operações com tributação diferenciada ou específica.</li>
+                    </ul>
                   </div>
                 </div>
-                <div>
-                  <button type="button" onclick="App.carregarNfsePorTomador()" id="btnCarregarPorTomador" class="w-full sm:w-auto px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 font-semibold text-xs rounded-xl border border-slate-300 shadow-sm transition-all flex items-center justify-center space-x-1.5 active:scale-95">
-                    <i data-lucide="user-check" class="w-3.5 h-3.5 text-blue-600"></i>
-                    <span>Carregar</span>
+
+                <div class="pt-4 border-t border-slate-100">
+                  <button type="button" onclick="App.iniciarEmissaoDoZero()" id="btnIniciarDoZero" class="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center space-x-2 active:scale-95">
+                    <i data-lucide="arrow-right" class="w-4 h-4 text-emerald-400"></i>
+                    <span>Preencher Nota do Zero</span>
                   </button>
                 </div>
               </div>
 
             </div>
+          </div>
+        </div>
 
-            <!-- Banner Informativo de Confirmação quando uma nota for carregada -->
+        <!-- ========================================================== -->
+        <!-- PÁGINA 2: FORMULÁRIO DE PREENCHIMENTO DA NOTA (DPS)         -->
+        <!-- ========================================================== -->
+        <div id="emissionFormView" class="hidden space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 space-y-6">
+            
+            <!-- Barra Superior do Formulário (Navegação & Status de Origem) -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-3">
+              <div class="flex items-center space-x-3">
+                <button type="button" onclick="App.showEmissionChoiceView()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all flex items-center space-x-1.5 border border-slate-200 active:scale-95" title="Voltar para a escolha do modo de emissão">
+                  <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
+                  <span>Trocar Modo</span>
+                </button>
+                <div>
+                  <div class="flex items-center space-x-2">
+                    <span id="emissionModeBadge" class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold uppercase">Emitindo do Zero</span>
+                    <h2 class="text-base font-bold text-slate-900">Emissão de NFS-e Nacional (DPS v1.00)</h2>
+                  </div>
+                  <p id="emissionModeSubtitle" class="text-[11px] text-slate-500">Preencha as seções abaixo para gerar e transmitir a DPS</p>
+                </div>
+              </div>
+
+              <div class="flex items-center space-x-2">
+                <button type="button" onclick="App.openSaveCurrentAsTemplateModal()" class="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200 shadow-2xs transition-colors flex items-center space-x-1.5" title="Salvar dados deste serviço como modelo para emissões futuras">
+                  <i data-lucide="bookmark-plus" class="w-3.5 h-3.5 text-brand-600"></i>
+                  <span>Salvar como Modelo</span>
+                </button>
+                <button type="button" onclick="App.previewXmlDps()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-colors flex items-center space-x-1.5 border border-slate-200">
+                  <i data-lucide="code" class="w-3.5 h-3.5"></i>
+                  <span>Ver XML da DPS</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Banners Informativos de Confirmação quando uma nota ou modelo for carregado -->
             <div id="loadPrevNoteAlert" class="hidden p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-xs text-emerald-900 flex items-center justify-between">
               <div class="flex items-center space-x-2">
                 <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 shrink-0"></i>
@@ -393,49 +513,7 @@
                 <i data-lucide="x" class="w-3.5 h-3.5"></i>
               </button>
             </div>
-          </div>
 
-          <!-- BLOCO: MODELOS PRONTOS DE NOTA FISCAL (TEMPLATES) -->
-          <div class="bg-slate-50/80 p-5 rounded-2xl border border-slate-200/90 space-y-4 shadow-sm">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200/70 pb-3 gap-2">
-              <div class="flex items-center space-x-2.5">
-                <div class="w-8 h-8 rounded-xl bg-brand-600/10 text-brand-600 flex items-center justify-center font-bold">
-                  <i data-lucide="layout-template" class="w-4 h-4"></i>
-                </div>
-                <div>
-                  <h3 class="text-sm font-bold text-slate-800">Modelos Prontos de Emissão (Templates)</h3>
-                  <p class="text-[11px] text-slate-500">Configure modelos frequentes de serviço e tributação para alterar apenas o tomador e emitir rapidamente</p>
-                </div>
-              </div>
-              <div class="flex flex-wrap items-center gap-2">
-                <button type="button" onclick="App.openManageTemplatesModal()" class="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl border border-slate-300 shadow-sm transition-all flex items-center space-x-1.5 active:scale-95">
-                  <i data-lucide="settings-2" class="w-3.5 h-3.5 text-slate-500"></i>
-                  <span>Gerenciar Modelos</span>
-                </button>
-                <button type="button" onclick="App.openSaveCurrentAsTemplateModal()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center space-x-1.5 active:scale-95">
-                  <i data-lucide="bookmark-plus" class="w-3.5 h-3.5"></i>
-                  <span>Salvar Atual como Modelo</span>
-                </button>
-              </div>
-            </div>
-
-            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1">
-              <div class="flex-1">
-                <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">Modelo de Serviço e Tributação</label>
-                <select id="selectEmissionTemplate" onchange="App.handleTemplateSelectChange(this.value)" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold bg-white text-slate-800 outline-none focus:ring-2 focus:ring-brand-500">
-                  <option value="">Nenhum modelo selecionado (Preenchimento manual)</option>
-                  <!-- Populado dinamicamente -->
-                </select>
-              </div>
-              <div class="sm:pt-5">
-                <button type="button" onclick="App.aplicarModeloSelecionado()" id="btnAplicarModelo" class="w-full sm:w-auto px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center space-x-1.5 active:scale-95">
-                  <i data-lucide="wand-2" class="w-4 h-4"></i>
-                  <span>Aplicar Modelo no Formulário</span>
-                </button>
-              </div>
-            </div>
-
-            <!-- Banner Informativo de Confirmação quando um modelo for aplicado -->
             <div id="templateAlert" class="hidden p-3 rounded-xl bg-brand-50 border border-brand-200 text-xs text-brand-900 flex items-center justify-between">
               <div class="flex items-center space-x-2">
                 <i data-lucide="check-circle" class="w-4 h-4 text-brand-600 shrink-0"></i>
@@ -445,7 +523,6 @@
                 <i data-lucide="x" class="w-3.5 h-3.5"></i>
               </button>
             </div>
-          </div>
 
           <!-- STEPPER INDICATOR DE ETAPAS DA EMISSÃO -->
           <div class="bg-slate-50/90 p-3 rounded-2xl border border-slate-200 shadow-sm">
@@ -1803,7 +1880,8 @@
             </div>
           </div>
         </div> <!-- Fim de emissionStepContainer-4 -->
-        </div>
+          </div> <!-- Fim do card branco do formulário -->
+        </div> <!-- Fim de emissionFormView -->
       </section>
 
       <!-- ========================================== -->

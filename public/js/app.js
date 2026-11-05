@@ -644,6 +644,121 @@ const App = {
     this.calculateEmissionTotals();
   },
 
+  // --- GERENCIAMENTO DE TELAS DE EMISSÃO (PÁGINA DE ESCOLHA VS FORMULÁRIO) ---
+  showEmissionChoiceView() {
+    const choiceView = document.getElementById('emissionChoiceView');
+    const formView = document.getElementById('emissionFormView');
+    if (choiceView) choiceView.classList.remove('hidden');
+    if (formView) formView.classList.add('hidden');
+    this.state.emissionInForm = false;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (window.lucide) lucide.createIcons();
+  },
+
+  showEmissionFormView(opts = {}) {
+    const choiceView = document.getElementById('emissionChoiceView');
+    const formView = document.getElementById('emissionFormView');
+    if (choiceView) choiceView.classList.add('hidden');
+    if (formView) {
+      formView.classList.remove('hidden');
+      formView.classList.add('fade-in');
+    }
+    this.state.emissionInForm = true;
+
+    const badge = document.getElementById('emissionModeBadge');
+    const sub = document.getElementById('emissionModeSubtitle');
+    if (badge && opts.badgeText) {
+      badge.innerText = opts.badgeText;
+      if (opts.mode === 'NOTA_ANTERIOR') {
+        badge.className = 'px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold uppercase';
+      } else if (opts.mode === 'MODELO') {
+        badge.className = 'px-2 py-0.5 rounded bg-brand-100 text-brand-800 text-[10px] font-bold uppercase';
+      } else {
+        badge.className = 'px-2 py-0.5 rounded bg-slate-200 text-slate-800 text-[10px] font-bold uppercase';
+      }
+    }
+    if (sub && opts.subtitle) {
+      sub.innerText = opts.subtitle;
+    }
+
+    this.goToEmissionStep(1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (window.lucide) lucide.createIcons();
+  },
+
+  iniciarEmissaoDoZero() {
+    this.clearEmissionForm();
+    if (this.state.activeRepresentation) {
+      this.fillEmissionFormWithRepresentation(this.state.activeRepresentation);
+    }
+    this.showEmissionFormView({
+      mode: 'ZERO',
+      badgeText: 'Emitindo do Zero',
+      subtitle: 'Formulário limpo para preenchimento manual completo de todas as seções.'
+    });
+  },
+
+  clearEmissionForm() {
+    const setVal = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.value = val;
+    };
+    const setRadio = (name, val) => {
+      const radio = document.querySelector(`input[name="${name}"][value="${val}"]`);
+      if (radio) radio.checked = true;
+    };
+
+    // Tomador
+    setVal('fTomadorDoc', '');
+    setVal('fTomadorNome', '');
+    setVal('fTomadorIm', '');
+    setVal('fTomadorEmail', '');
+    setVal('fTomadorTelefone', '');
+    setVal('fTomadorCep', '');
+    setVal('fTomadorLogradouro', '');
+    setVal('fTomadorNumero', '');
+    setVal('fTomadorComplemento', '');
+    setVal('fTomadorBairro', '');
+    setRadio('fTomadorLocalizacao', 'brasil');
+    setVal('fTomadorPais', '1058');
+
+    // Serviço
+    setVal('fDescricaoServico', '');
+    setVal('fArtRrt', '');
+    setVal('fDocReferencia', '');
+    setVal('fInformacoesComplementares', '');
+    setVal('fCTribNac', '');
+    setVal('fItemNbs', '');
+    const descEl = document.getElementById('fDescricaoServico');
+    if (descEl) this.handleDescricaoInput(descEl);
+
+    // Valores
+    setVal('fValorServico', '');
+    setVal('fValorIntermediario', '');
+    setVal('fDescontoIncondicionado', '');
+    setVal('fDescontoCondicionado', '');
+    setRadio('fRetencaoIssqnRadio', 'nao');
+    this.handleRetencaoIssqnChange('nao');
+    setVal('fAliquotaIss', '2.00');
+    setVal('fAliquotaRetencao', '2.00');
+    setVal('fRetIr', '');
+    setVal('fRetContrSociais', '');
+    setVal('fRetInss', '');
+
+    // IBS/CBS
+    setRadio('fIbsCbs', 'nao');
+
+    // Data de Competência atual
+    const hoje = new Date().toISOString().substring(0, 10);
+    setVal('fDataCompetencia', hoje);
+    const dispComp = document.getElementById('dispDataCompetencia');
+    if (dispComp) dispComp.value = new Date().toLocaleDateString('pt-BR');
+
+    // Totais e etapas
+    this.calculateEmissionTotals();
+    this.goToEmissionStep(1);
+  },
+
   // --- CARREGAR DADOS DE UMA NOTA ANTERIOR ---
   showLoadPreviousNoteAlert(msg) {
     const alertEl = document.getElementById('loadPrevNoteAlert');
@@ -812,9 +927,16 @@ const App = {
     // 5. Recalcula totais
     this.calculateEmissionTotals();
 
-    // 6. Alerta de sucesso
+    // 5.1 Transiciona da página de escolha para o formulário de emissão
     const numNfse = nfse.numeroNfse || nfse.numeroDps || '';
     const tomadorNome = nfse.tomador?.nome || nfse.tomador?.razaoSocial || nfse.tomador?.doc || 'Tomador';
+    this.showEmissionFormView({
+      mode: 'NOTA_ANTERIOR',
+      badgeText: `Baseada na NFS-e nº ${numNfse}`,
+      subtitle: `Dados carregados da nota anterior de ${tomadorNome}. Revise os valores antes de emitir.`
+    });
+
+    // 6. Alerta de sucesso
     this.showLoadPreviousNoteAlert(`Dados da NFS-e nº ${numNfse} (${tomadorNome}) carregados com sucesso! Revise os valores antes de emitir.`);
 
     // 7. Scroll suave para o primeiro campo do tomador
@@ -1036,6 +1158,13 @@ const App = {
 
     // 4. Recalcula totais
     this.calculateEmissionTotals();
+
+    // 4.1 Transiciona da página de escolha para o formulário de emissão
+    this.showEmissionFormView({
+      mode: 'MODELO',
+      badgeText: `Modelo: ${template.nome}`,
+      subtitle: `Modelo de serviço e tributação "${template.nome}" aplicado. Preencha os dados do tomador para emitir.`
+    });
 
     // 5. Toast Alert
     const alertEl = document.getElementById('templateAlert');
@@ -4432,7 +4561,8 @@ const App = {
       if (this.state.activeRepresentation) {
         this.fillEmissionFormWithRepresentation(this.state.activeRepresentation);
       }
-      this.goToEmissionStep(1);
+      this.loadTemplates();
+      this.showEmissionChoiceView();
     }
 
     if (window.lucide) lucide.createIcons();
