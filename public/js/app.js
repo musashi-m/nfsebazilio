@@ -21,6 +21,9 @@ async function safeFetchJson(url, options = {}) {
 
 const IBGE_MUNICIPIOS_MAP = {
   '2800308': 'Aracaju/SE',
+  '2905701': 'Camaçari/BA',
+  '2927408': 'Salvador/BA',
+  '2910800': 'Feira de Santana/BA',
   '2803609': 'Laranjeiras/SE',
   '2804805': 'Nossa Senhora do Socorro/SE',
   '2806701': 'São Cristóvão/SE',
@@ -28,6 +31,10 @@ const IBGE_MUNICIPIOS_MAP = {
   '2803500': 'Lagarto/SE',
   '2802106': 'Estância/SE',
   '2800605': 'Barra dos Coqueiros/SE',
+  '2807402': 'Tobias Barreto/SE',
+  '2807105': 'Simão Dias/SE',
+  '2805703': 'Propriá/SE',
+  '2802809': 'Itaporanga d\'Ajuda/SE',
   '3550308': 'São Paulo/SP',
   '3509502': 'Campinas/SP',
   '3549805': 'São José dos Campos/SP',
@@ -53,15 +60,10 @@ const IBGE_MUNICIPIOS_MAP = {
   '4209102': 'Joinville/SC',
   '4202404': 'Blumenau/SC',
   '5300108': 'Brasília/DF',
-  '2927408': 'Salvador/BA',
-  '2910800': 'Feira de Santana/BA',
-  '2933307': 'Vitória da Conquista/BA',
-  '2304400': 'Fortaleza/CE',
   '5208707': 'Goiânia/GO',
+  '2304400': 'Fortaleza/CE',
   '2611606': 'Recife/PE',
   '3205309': 'Vitória/ES',
-  '3205002': 'Serra/ES',
-  '3205200': 'Vila Velha/ES',
   '1501402': 'Belém/PA',
   '1302603': 'Manaus/AM',
   '2704302': 'Maceió/AL',
@@ -77,6 +79,19 @@ const IBGE_MUNICIPIOS_MAP = {
   '1400100': 'Boa Vista/RR',
   '1600303': 'Macapá/AP'
 };
+
+// Integração de todos os 5.571 municípios do Brasil para o mapa IBGE
+if (typeof window !== 'undefined') {
+  const popularMunicipiosMap = () => {
+    if (window.MUNICIPIOS_BRASIL && Array.isArray(window.MUNICIPIOS_BRASIL)) {
+      window.MUNICIPIOS_BRASIL.forEach(m => {
+        IBGE_MUNICIPIOS_MAP[m.id] = `${m.nome}/${m.uf}`;
+      });
+    }
+  };
+  popularMunicipiosMap();
+  window.addEventListener('DOMContentLoaded', popularMunicipiosMap);
+}
 
 const App = {
   state: {
@@ -593,9 +608,13 @@ const App = {
     setVal('fPrestadorCnpj', comp.cnpj);
     setVal('fPrestadorRazaoSocial', comp.razaoSocial);
     setVal('fPrestadorIm', comp.im || '842161');
-    setVal('fMunicipioIbge', comp.municipioIbge || '2800308');
-    setVal('fLocalPrestacaoIbge', comp.municipioIbge || '2800308');
-    setVal('fMunicipioIncidencia', 'Aracaju/SE');
+    const codIbge = comp.municipioIbge || '2800308';
+    setVal('fMunicipioIbge', codIbge);
+    setVal('fLocalPrestacaoIbge', codIbge);
+    const nomeCidade = comp.municipioNome ? `${comp.municipioNome}/${comp.uf || 'SE'}` : (IBGE_MUNICIPIOS_MAP[codIbge] || 'Aracaju/SE');
+    setVal('fMunicipioIncidencia', nomeCidade);
+    this.atualizarDisplayMunicipio(codIbge, 'prestador');
+    this.atualizarDisplayMunicipio(codIbge, 'local');
 
     const hoje = new Date().toISOString().substring(0, 10);
     setVal('fDataCompetencia', hoje);
@@ -707,6 +726,7 @@ const App = {
       const cMun = s.cMunIncid || s.municipioIbge || '2800308';
       setVal('fLocalPrestacaoIbge', cMun);
       setVal('fMunicipioIncidencia', IBGE_MUNICIPIOS_MAP[cMun] || s.xLocIncid || 'Aracaju/SE');
+      this.atualizarDisplayMunicipio(cMun, 'local');
       setVal('fPaisPrestacao', s.cPais || '1058');
 
       // Código de Tributação Nacional (LC 116)
@@ -1403,15 +1423,128 @@ const App = {
     }
   },
 
+  // ==========================================
+  // AUTOCOMPLETE INTELIGENTE DE MUNICÍPIOS (5.571 Cidades do Brasil)
+  // ==========================================
+  abrirBuscaMunicipio(tipo) {
+    const input = document.getElementById(tipo === 'local' ? 'fLocalPrestacaoSearch' : 'fMunicipioPrestadorSearch');
+    this.filtrarMunicipios(input?.value || '', tipo);
+    const dropdown = document.getElementById(tipo === 'local' ? 'fLocalPrestacaoDropdown' : 'fMunicipioPrestadorDropdown');
+    if (dropdown) dropdown.classList.remove('hidden');
+  },
+
+  fecharBuscaMunicipio(tipo) {
+    setTimeout(() => {
+      const dropdown = document.getElementById(tipo === 'local' ? 'fLocalPrestacaoDropdown' : 'fMunicipioPrestadorDropdown');
+      if (dropdown) dropdown.classList.add('hidden');
+    }, 250);
+  },
+
+  toggleBuscaMunicipio(tipo) {
+    const dropdown = document.getElementById(tipo === 'local' ? 'fLocalPrestacaoDropdown' : 'fMunicipioPrestadorDropdown');
+    if (dropdown && dropdown.classList.contains('hidden')) {
+      this.abrirBuscaMunicipio(tipo);
+    } else if (dropdown) {
+      dropdown.classList.add('hidden');
+    }
+  },
+
+  filtrarMunicipios(query, tipo) {
+    const dropdown = document.getElementById(tipo === 'local' ? 'fLocalPrestacaoDropdown' : 'fMunicipioPrestadorDropdown');
+    if (!dropdown) return;
+
+    let lista = (window.MUNICIPIOS_BRASIL && Array.isArray(window.MUNICIPIOS_BRASIL)) ? window.MUNICIPIOS_BRASIL : [];
+    const q = (query || '').trim().toLowerCase();
+
+    let filtrados = [];
+    if (!q) {
+      // Destaque para Sergipe e Bahia por padrão quando o campo está limpo
+      filtrados = lista.filter(m => m.uf === 'SE' || m.uf === 'BA' || m.id === '3550308' || m.id === '3304557' || m.id === '5300108').slice(0, 30);
+    } else {
+      const normQ = q.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      filtrados = lista.filter(m => {
+        const normNome = m.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        return normNome.includes(normQ) || m.id.includes(q) || `${normNome}/${m.uf.toLowerCase()}`.includes(normQ);
+      }).slice(0, 50);
+    }
+
+    if (filtrados.length === 0) {
+      dropdown.innerHTML = `
+        <div class="px-4 py-3 text-xs text-slate-400 text-center">
+          Nenhum município encontrado para "${query}".
+        </div>
+      `;
+      dropdown.classList.remove('hidden');
+      return;
+    }
+
+    dropdown.innerHTML = filtrados.map(m => {
+      const isSE = m.uf === 'SE';
+      const isBA = m.uf === 'BA';
+      const badgeColor = isSE ? 'bg-emerald-100 text-emerald-800' : (isBA ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700');
+      const nomeCompleto = `${m.nome}/${m.uf}`;
+      return `
+        <div onclick="App.selecionarMunicipio('${m.id}', '${nomeCompleto.replace(/'/g, "\\'")}', '${tipo}')"
+          class="flex items-center justify-between px-3.5 py-2.5 hover:bg-emerald-50/70 cursor-pointer transition-colors text-xs text-slate-800">
+          <div class="flex items-center space-x-2">
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${badgeColor}">${m.uf}</span>
+            <span class="font-medium text-slate-900">${m.nome}</span>
+          </div>
+          <span class="font-mono text-[11px] text-slate-400">IBGE: ${m.id}</span>
+        </div>
+      `;
+    }).join('');
+
+    dropdown.classList.remove('hidden');
+  },
+
+  selecionarMunicipio(codigoIbge, nomeUf, tipo) {
+    const isLocal = tipo === 'local';
+    const inputSearch = document.getElementById(isLocal ? 'fLocalPrestacaoSearch' : 'fMunicipioPrestadorSearch');
+    const inputHidden = document.getElementById(isLocal ? 'fLocalPrestacaoIbge' : 'fMunicipioIbge');
+    const dropdown = document.getElementById(isLocal ? 'fLocalPrestacaoDropdown' : 'fMunicipioPrestadorDropdown');
+
+    if (inputSearch) inputSearch.value = nomeUf;
+    if (inputHidden) inputHidden.value = codigoIbge;
+    if (dropdown) dropdown.classList.add('hidden');
+
+    if (!isLocal) {
+      const prestSelect = document.getElementById('fMunicipioPrestadorSelect');
+      if (prestSelect) prestSelect.value = codigoIbge;
+      const localSearch = document.getElementById('fLocalPrestacaoSearch');
+      const localHidden = document.getElementById('fLocalPrestacaoIbge');
+      if (localSearch && (!localSearch.value || localSearch.value === 'Aracaju/SE')) {
+        localSearch.value = nomeUf;
+      }
+      if (localHidden && (!localHidden.value || localHidden.value === '2800308')) {
+        localHidden.value = codigoIbge;
+      }
+    }
+
+    const munIncid = document.getElementById('fMunicipioIncidencia');
+    if (munIncid) munIncid.value = nomeUf;
+  },
+
+  atualizarDisplayMunicipio(codigoIbge, tipo) {
+    if (!codigoIbge) return;
+    const nomeUf = IBGE_MUNICIPIOS_MAP[codigoIbge] || codigoIbge;
+    const isLocal = tipo === 'local';
+    const inputSearch = document.getElementById(isLocal ? 'fLocalPrestacaoSearch' : 'fMunicipioPrestadorSearch');
+    const inputHidden = document.getElementById(isLocal ? 'fLocalPrestacaoIbge' : 'fMunicipioIbge');
+    if (inputSearch) inputSearch.value = nomeUf;
+    if (inputHidden) inputHidden.value = codigoIbge;
+  },
+
   handleMunicipioPrestadorChange(val) {
     const hiddenIbge = document.getElementById('fMunicipioIbge');
     const localPrest = document.getElementById('fLocalPrestacaoIbge');
     const munIncid = document.getElementById('fMunicipioIncidencia');
     if (hiddenIbge) hiddenIbge.value = val;
     if (localPrest) localPrest.value = val;
-    const select = document.getElementById('fMunicipioPrestadorSelect');
-    const text = select?.options[select.selectedIndex]?.text || 'Aracaju/SE';
+    const text = IBGE_MUNICIPIOS_MAP[val] || 'Aracaju/SE';
     if (munIncid) munIncid.value = text;
+    this.atualizarDisplayMunicipio(val, 'prestador');
+    this.atualizarDisplayMunicipio(val, 'local');
   },
 
   handleTomadorLocalizacaoChange(loc) {
@@ -4801,6 +4934,18 @@ const App = {
     }
   }
 };
+
+// Fecha dropdowns de municípios ao clicar fora
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#comboboxPrestadorMunWrapper')) {
+    const d = document.getElementById('fMunicipioPrestadorDropdown');
+    if (d) d.classList.add('hidden');
+  }
+  if (!e.target.closest('#comboboxLocalPrestacaoWrapper')) {
+    const d = document.getElementById('fLocalPrestacaoDropdown');
+    if (d) d.classList.add('hidden');
+  }
+});
 
 window.App = App;
 window.addEventListener('DOMContentLoaded', () => App.init());

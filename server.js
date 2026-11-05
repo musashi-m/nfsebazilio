@@ -808,6 +808,34 @@ app.get('/api/errors/dictionary', (req, res) => {
   res.json(ERROR_DICTIONARY);
 });
 
+// Endpoint de consulta oficial de municípios IBGE (todos os 5.571 municípios do Brasil)
+let MUNICIPIOS_BRASIL = [];
+try {
+  MUNICIPIOS_BRASIL = require('./src/utils/municipios_ibge.json');
+} catch (e) {
+  console.warn('Aviso: municipios_ibge.json não encontrado:', e.message);
+}
+
+app.get('/api/municipios', (req, res) => {
+  const q = (req.query.q || '').trim().toLowerCase();
+  const uf = (req.query.uf || '').trim().toUpperCase();
+  const limit = parseInt(req.query.limit, 10) || 60;
+
+  let results = MUNICIPIOS_BRASIL;
+  if (uf) {
+    results = results.filter(m => m.uf === uf);
+  }
+  if (q) {
+    const normQ = q.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    results = results.filter(m => {
+      const normNome = m.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return normNome.includes(normQ) || m.id.includes(q) || `${normNome}/${m.uf.toLowerCase()}`.includes(normQ);
+    });
+  }
+
+  res.json(results.slice(0, limit));
+});
+
 // Inicia servidor apenas se executado diretamente
 if (require.main === module) {
   app.listen(PORT, '0.0.0.0', () => {
