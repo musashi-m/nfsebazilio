@@ -127,9 +127,13 @@ class StorageService {
       }
     }
 
-    // Filtro por Ambiente
+    // Filtro por Ambiente (tolerante a maiúsculas/minúsculas e registros legados)
     if (filters.ambiente) {
-      list = list.filter(item => item.ambiente === filters.ambiente);
+      const ambNorm = String(filters.ambiente).toUpperCase();
+      list = list.filter(item => {
+        if (!item.ambiente) return true;
+        return String(item.ambiente).toUpperCase() === ambNorm;
+      });
     }
 
     // Filtro por Status

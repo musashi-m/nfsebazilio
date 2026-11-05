@@ -117,6 +117,7 @@ const App = {
     await this.loadInitialData();
     this.renderHeader();
     this.renderActiveTab();
+    this.startAdnPolling();
     if (window.lucide) lucide.createIcons();
   },
 
@@ -2171,12 +2172,14 @@ const App = {
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.totalSincronizadas > 0) {
+        const hasChanges = (data.totalSincronizadas > 0) || (data.totalEventos > 0) || (data.totalModificadas > 0);
+        if (hasChanges) {
           const fresh = await safeFetchJson(`/api/adn/history?prestadorCnpj=${cnpj}&ambiente=${this.state.currentEnvironment}`);
           this.state.history = fresh.notas || [];
           this.applyHistoryFilters();
           this.renderDashboard();
           this.loadSyncStatus(cnpj);
+          this.showToast('✓ ADN atualizado: novos documentos ou cancelamentos detectados em tempo real!', 'info');
         }
       }
     } catch (err) {
@@ -2184,6 +2187,17 @@ const App = {
     } finally {
       this._isSilentSyncing = false;
     }
+  },
+
+  startAdnPolling() {
+    if (this._adnPollingInterval) clearInterval(this._adnPollingInterval);
+    // Checagem em segundo plano a cada 30 segundos (atualização contínua em tempo real com o Emissor Nacional)
+    this._adnPollingInterval = setInterval(() => {
+      const cnpj = this.state.activeRepresentation?.cnpjRaw;
+      if (cnpj && this.state.certificate) {
+        this.silentSyncAdn(cnpj);
+      }
+    }, 30000);
   },
 
   async loadSyncStatus(cnpj) {
@@ -3209,8 +3223,13 @@ const App = {
         window.friendlyErrorModal.show(res.error);
       } else {
         await this.loadHistory();
-        this.showToast(`Sincronização com o ADN concluída! Documentos sincronizados: ${res.totalSincronizadas}`);
-        alert(`Sincronização ADN Oficial Concluída!\n\nDocumentos processados nesta execução: ${res.totalSincronizadas}\nÚltimo NSU da fila: ${res.ultNSU}\nTotal de notas disponíveis: ${res.notas ? res.notas.length : 0}`);
+        const totalNovas = res.totalSincronizadas || 0;
+        const totalEv = res.totalEventos || 0;
+        const msgToast = totalEv > 0 
+          ? `Sincronização ADN concluída! ${totalNovas} nova(s) NFS-e e ${totalEv} cancelamento(s)/evento(s) atualizados.`
+          : `Sincronização com o ADN concluída! Documentos sincronizados: ${totalNovas}`;
+        this.showToast(msgToast);
+        alert(`Sincronização ADN Oficial Concluída!\n\nNovas NFS-e baixadas: ${totalNovas}\nEventos / Cancelamentos atualizados: ${totalEv}\nÚltimo NSU da fila: ${res.ultNSU}\nTotal de notas disponíveis: ${res.notas ? res.notas.length : 0}`);
       }
     } catch (e) {
       window.friendlyErrorModal.show({
@@ -4200,7 +4219,12 @@ const App = {
       return cleanRepCnpj ? tDoc.includes(cleanRepCnpj) : false;
     });
 
-    const totalCanceladas = notes.filter(n => n.status === 'CANCELADA' || Boolean(n.dataCancelamento));
+    const totalCanceladas = notes.filter(n => {
+      const pCnpj = (n.prestador?.cnpjRaw || n.prestador?.cnpj || '').replace(/\D/g, '');
+      const tDoc = (n.tomador?.docRaw || n.tomador?.doc || '').replace(/\D/g, '');
+      const isRelated = cleanRepCnpj ? (pCnpj.includes(cleanRepCnpj) || tDoc.includes(cleanRepCnpj)) : true;
+      return isRelated && (n.status === 'CANCELADA' || Boolean(n.dataCancelamento) || Boolean(n.motivoCancelamento));
+    });
     const autorizadasPrestadas = prestadas.filter(n => n.status !== 'CANCELADA' && !n.dataCancelamento);
     const faturamentoTotal = autorizadasPrestadas.reduce((acc, cur) => acc + this.getNotaValor(cur), 0);
     const despesasTomadasTotal = tomadas.filter(n => n.status !== 'CANCELADA' && !n.dataCancelamento).reduce((acc, cur) => acc + this.getNotaValor(cur), 0);

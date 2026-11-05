@@ -303,6 +303,7 @@ class AdnService {
     let currentNsu = options.startFromZero ? 0 : (syncState.ultNSU || 0);
     const maxBatches = options.maxBatches || 50; // Até 2.500 documentos por sincronização
     let totalSincronizadas = 0;
+    let totalEventos = 0;
     let batchCount = 0;
     const parsedRecords = [];
 
@@ -383,7 +384,10 @@ class AdnService {
               if (isCancelamento && targetChave) {
                 const descMatch = xmlEvento.match(/<(?:xDesc|descEvento)>([^<]+)<\//i);
                 const motivo = (doc.TipoEvento || (descMatch ? descMatch[1] : null) || 'Cancelamento homologado no ADN').replace(/_/g, ' ');
-                storageService.updateNfseStatus(targetChave, 'CANCELADA', motivo);
+                const updated = storageService.updateNfseStatus(targetChave, 'CANCELADA', motivo);
+                if (updated) {
+                  totalEventos++;
+                }
               }
             } catch (eErr) {
               console.warn(`Aviso ao processar evento do NSU ${docNsu}:`, eErr.message);
@@ -412,6 +416,8 @@ class AdnService {
       return {
         success: true,
         totalSincronizadas,
+        totalEventos,
+        totalModificadas: totalSincronizadas + totalEventos,
         ultNSU: currentNsu,
         batchesProcessed: batchCount,
         notas: storageService.getHistory({ prestadorCnpj: cleanCnpj }),
