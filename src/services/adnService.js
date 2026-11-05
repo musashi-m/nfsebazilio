@@ -400,11 +400,12 @@ class AdnService {
               const targetChave = docChave || xmlParserService.extractChaveFromXml(xmlEvento);
               
               const isCancelamento = (
+                xmlEvento.includes('101101') ||
                 xmlEvento.includes('110111') ||
                 xmlEvento.includes('105102') ||
                 xmlEvento.includes('105104') ||
                 (doc.TipoEvento && String(doc.TipoEvento).toUpperCase().includes('CANCEL')) ||
-                /<(?:[a-zA-Z0-9_-]+:)?(?:e110111|e105102|e105104|pedCan|infPedCan|retCancelamento)/i.test(xmlEvento) ||
+                /<(?:[a-zA-Z0-9_-]+:)?(?:e101101|e110111|e105102|e105104|pedCan|infPedCan|retCancelamento)/i.test(xmlEvento) ||
                 /<descEvento>[^<]*cancelamento/i.test(xmlEvento) ||
                 /<xDesc>[^<]*cancelamento/i.test(xmlEvento) ||
                 /cancelamento/i.test(xmlEvento)
@@ -527,7 +528,7 @@ class AdnService {
         data.cStat === 101 ||
         data.cStat === '101' ||
         data.situacao === 'CANCELADA' ||
-        (Array.isArray(data.eventos) && data.eventos.some(e => e.tpEvento === '110111' || /cancel/i.test(e.xDescEvento || '')))
+        (Array.isArray(data.eventos) && data.eventos.some(e => e.tpEvento === '101101' || e.tpEvento === '110111' || /cancel/i.test(e.xDescEvento || '')))
       );
 
       if (isSefinCancelled) {
@@ -635,7 +636,8 @@ class AdnService {
     const dhEvento = now.toISOString().replace(/\.\d{3}Z$/, '') + `${diff}${pad(tzOffset / 60)}:${pad(tzOffset % 60)}`;
 
     const cleanCnpjAutor = (existing.prestador && (existing.prestador.cnpjRaw || (existing.prestador.cnpj && existing.prestador.cnpj.replace(/\D/g, '')))) || certInfo.docRaw;
-    const pedRegId = `PRE${cleanChave}`;
+    const tpEvento = '101101';
+    const pedRegId = `PRE${cleanChave}${tpEvento}`;
     const autorTag = cleanCnpjAutor.length === 11 
       ? `<CPFAutor>${cleanCnpjAutor}</CPFAutor>`
       : `<CNPJAutor>${cleanCnpjAutor}</CNPJAutor>`;
@@ -648,7 +650,6 @@ class AdnService {
           `<dhEvento>${dhEvento}</dhEvento>` +
           `${autorTag}` +
           `<chNFSe>${cleanChave}</chNFSe>` +
-          `<nPedRegEvento>1</nPedRegEvento>` +
           `<e101101>` +
             `<xDesc>Cancelamento de NFS-e</xDesc>` +
             `<cMotivo>${codMotivo}</cMotivo>` +
@@ -683,8 +684,7 @@ class AdnService {
 
     try {
       const response = await axios.post(endpoint, {
-        pedidoRegistroEventoXmlGZipB64: gzipB64,
-        eventoXmlGZipB64: gzipB64
+        pedidoRegistroEventoXmlGZipB64: gzipB64
       }, {
         headers: {
           'Content-Type': 'application/json',
@@ -700,13 +700,18 @@ class AdnService {
       if (resData.eventoXmlGZipB64) {
         try {
           const retXml = zlib.gunzipSync(Buffer.from(resData.eventoXmlGZipB64, 'base64')).toString('utf8');
-          const protoMatch = retXml.match(/<(?:nProt|protocolo)>([^<]+)<\//i);
-          if (protoMatch) protocoloCancelamento = protoMatch[1];
+          const idMatch = retXml.match(/<infEvento\s+Id="([^"]+)"/i);
+          if (idMatch) {
+            protocoloCancelamento = idMatch[1];
+          } else {
+            const protoMatch = retXml.match(/<(?:nProt|protocolo)>([^<]+)<\//i);
+            if (protoMatch) protocoloCancelamento = protoMatch[1];
+          }
         } catch (_) {}
       }
 
       if (!protocoloCancelamento) {
-        protocoloCancelamento = `SEFIN-CANC-${Date.now()}`;
+        protocoloCancelamento = `EVT${cleanChave}101101001`;
       }
 
       const motivoCompleto = `${descMotivo}: ${xMotivo}`;
@@ -726,24 +731,27 @@ class AdnService {
       if (err.response && err.response.data) {
         const errData = err.response.data;
         let errMsg = '';
-        if (errData.mensagens && Array.isArray(errData.mensagens)) {
+        if (errData.erro && Array.isArray(errData.erro)) {
+          errMsg = errData.erro.map(e => `[${e.codigo || ''}] ${e.descricao || ''} ${e.complemento ? '(' + e.complemento + ')' : ''}`.trim()).join('; ');
+        } else if (errData.mensagens && Array.isArray(errData.mensagens)) {
           errMsg = errData.mensagens.map(m => `[${m.codigo || ''}] ${m.descricao || m.mensagem || ''}`).join('; ');
         } else if (errData.mensagem || errData.error) {
           errMsg = errData.mensagem || errData.error;
         }
 
+        // Se a SEFIN reportar que a nota já está cancelada ou evento já registrado (E0840)
+        if (/E0840|já está vinculado|já cancelada|ja cancelada|cancelamento homologado|já foi cancelada/i.test(errMsg)) {
+          const cancelada = storageService.updateNfseStatus(cleanChave, 'CANCELADA', `${descMotivo}: ${xMotivo}`);
+          return {
+            success: true,
+            mensagem: 'Esta NFS-e já se encontrava cancelada no Ambiente Nacional e seu status foi atualizado com sucesso!',
+            protocoloCancelamento: 'CONFIRMADO_SEFIN',
+            nfse: cancelada
+          };
+        }
+
         if (errMsg) {
-          // Se a SEFIN reportar que a nota já está cancelada
-          if (/já cancelada|ja cancelada|cancelamento homologado|já foi cancelada/i.test(errMsg)) {
-            const cancelada = storageService.updateNfseStatus(cleanChave, 'CANCELADA', `${descMotivo}: ${xMotivo}`);
-            return {
-              success: true,
-              mensagem: 'Esta NFS-e já se encontrava cancelada no Ambiente Nacional e seu status foi atualizado com sucesso!',
-              protocoloCancelamento: 'CONFIRMADO_SEFIN',
-              nfse: cancelada
-            };
-          }
-          throw translateError(new Error(errMsg), { step: 'Registro de Cancelamento no SEFIN Nacional' });
+          throw translateError(new Error(errMsg), { step: 'Registro de Cancelamento no SEFIN Nacional', category: 'Cancelamento NFS-e' });
         }
       }
       throw translateError(err, { step: 'Cancelamento de NFS-e no SEFIN Nacional' });

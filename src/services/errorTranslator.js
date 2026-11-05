@@ -199,6 +199,30 @@ const ERROR_DICTIONARY = [
     severity: 'info'
   },
 
+  // --- CANCELAMENTO E EVENTOS SEFIN ---
+  {
+    regex: /(E0840|evento de Cancelamento de NFS-e já está vinculado|já cancelada|ja cancelada|cancelamento homologado|já foi cancelada)/i,
+    category: 'Cancelamento NFS-e',
+    title: 'NFS-e Já Cancelada no Portal Nacional',
+    friendlyMessage: 'O evento de cancelamento desta NFS-e já se encontra homologado no Ambiente de Dados Nacional (SEFIN Nacional / Receita Federal).',
+    howToFix: [
+      'A nota fiscal já está cancelada e válida com o status oficial de cancelamento perante o Fisco.',
+      'O status no sistema foi sincronizado automaticamente para CANCELADA.'
+    ],
+    severity: 'info'
+  },
+  {
+    regex: /(E1235|Falha no esquema XML)/i,
+    category: 'Validação de Esquema XML',
+    title: 'Falha no Esquema XML do Evento',
+    friendlyMessage: 'A SEFIN Nacional reportou que o XML do evento de cancelamento divergiu das regras de validação estrutural do leiaute vigente.',
+    howToFix: [
+      'O sistema utiliza o padrão oficial v1.00 com identificador padronizado PRE.',
+      'Consulte os detalhes técnicos abaixo para inspecionar os atributos recusados.'
+    ],
+    severity: 'error'
+  },
+
   // --- CONEXÃO, REDE, RFB E SERPRO ---
   {
     regex: /(ETIMEDOUT|timeout|timed out|tempo limite esgotado)/i,
@@ -248,7 +272,7 @@ const ERROR_DICTIONARY = [
     severity: 'error'
   },
   {
-    regex: /(500|502|503|504|internal server error|bad gateway|service unavailable)/i,
+    regex: /(500 Internal Server Error|502 Bad Gateway|503 Service Unavailable|504 Gateway Timeout|internal server error|bad gateway|service unavailable)/i,
     category: 'Servidores da RFB / SERPRO',
     title: 'Instabilidade Temporária no Portal Nacional',
     friendlyMessage: 'O Ambiente de Dados Nacional (ADN da Receita Federal) retornou uma falha temporária interna.',
@@ -274,9 +298,21 @@ function translateError(err, context = {}) {
     rawMessage = err;
     technicalDetail = err;
   } else if (err && typeof err === 'object') {
-    rawMessage = err.message || err.desc || err.erro || err.mensagem || JSON.stringify(err);
+    if (err.response && err.response.data) {
+      const d = err.response.data;
+      if (d.erro && Array.isArray(d.erro)) {
+        rawMessage = d.erro.map(e => `[${e.codigo || ''}] ${e.descricao || ''} ${e.complemento ? '(' + e.complemento + ')' : ''}`.trim()).join('; ');
+      } else if (d.mensagens && Array.isArray(d.mensagens)) {
+        rawMessage = d.mensagens.map(m => `[${m.codigo || ''}] ${m.descricao || m.mensagem || ''}`).join('; ');
+      } else if (d.mensagem || d.error || d.descricao) {
+        rawMessage = d.mensagem || d.error || d.descricao;
+      }
+    }
+    if (!rawMessage) {
+      rawMessage = err.message || err.desc || err.erro || err.mensagem || JSON.stringify(err);
+    }
     rawCode = err.code || err.codigo || (err.response && err.response.status) || '';
-    technicalDetail = err.stack || (err.response && JSON.stringify(err.response.data)) || rawMessage;
+    technicalDetail = (err.response && typeof err.response.data === 'object' ? JSON.stringify(err.response.data, null, 2) : '') || err.stack || rawMessage;
   }
 
   // Tenta encontrar correspondência no dicionário
