@@ -3480,15 +3480,155 @@ const App = {
     window.location.href = `/api/adn/nfse/${chaveAcesso}/xml`;
   },
 
-  async promptCancelamento(chaveAcesso) {
-    const motivo = prompt('Informe o motivo oficial do cancelamento (ex: Erro na emissão, Serviço não prestado, Duplicidade):', 'Erro na emissão');
-    if (!motivo) return;
+  promptCancelamento(chaveAcesso) {
+    const cleanChave = (chaveAcesso || '').replace(/\D/g, '');
+    const nfse = (this.state.history || []).find(n => (n.chaveAcesso || '').replace(/\D/g, '') === cleanChave || n.chaveAcesso === chaveAcesso);
+    if (!nfse) {
+      alert('NFS-e não encontrada no histórico.');
+      return;
+    }
 
-    const justificativa = prompt('Digite a justificativa detalhada (mínimo 15 caracteres):', 'Cancelamento operacional solicitado pelo prestador');
-    if (!justificativa) return;
+    if (nfse.status === 'CANCELADA') {
+      alert('Esta nota fiscal já está com o status CANCELADA no sistema.');
+      return;
+    }
+
+    this._cancNfseAtiva = nfse;
+
+    // Popula campos do modal idêntico ao portal nacional
+    const chaveEl = document.getElementById('cancChaveAcesso');
+    if (chaveEl) chaveEl.value = nfse.chaveAcesso || chaveAcesso;
+
+    // Detalhes da NFS-e
+    const numDpsEl = document.getElementById('cancDetNumDps');
+    if (numDpsEl) numDpsEl.innerText = nfse.numeroDps || '-';
+
+    const serieDpsEl = document.getElementById('cancDetSerieDps');
+    if (serieDpsEl) serieDpsEl.innerText = nfse.serie || '1';
+
+    const numNfseEl = document.getElementById('cancDetNumNfse');
+    if (numNfseEl) numNfseEl.innerText = nfse.numeroNfse || '-';
+
+    const dataGerEl = document.getElementById('cancDetDataGeracao');
+    if (dataGerEl) {
+      const d = nfse.dataEmissao || nfse.dataAutorizacao || nfse.createdAt || '';
+      dataGerEl.innerText = d ? new Date(d).toLocaleDateString('pt-BR') : '-';
+    }
+
+    const valorEl = document.getElementById('cancDetValorServico');
+    if (valorEl) {
+      const v = Number(nfse.valores?.vServ ?? nfse.valores?.valorServico ?? nfse.valores?.valorLiquido ?? 0);
+      valorEl.innerText = v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    const munEl = document.getElementById('cancDetMunicipio');
+    if (munEl) {
+      const ibge = nfse.municipioIbge || nfse.prestador?.municipioIbge || '2800308';
+      munEl.innerText = (typeof IBGE_MUNICIPIOS_MAP !== 'undefined' && IBGE_MUNICIPIOS_MAP[ibge]) || 'Aracaju/SE';
+    }
+
+    const tomadorEl = document.getElementById('cancDetTomador');
+    if (tomadorEl) {
+      const doc = nfse.tomador?.doc || nfse.tomador?.docRaw || '';
+      const nome = nfse.tomador?.nome || nfse.tomador?.razaoSocial || '';
+      tomadorEl.innerText = doc ? `${doc} - ${nome}` : (nome || 'Não Identificado');
+    }
+
+    const servEl = document.getElementById('cancDetServico');
+    if (servEl) {
+      const ctn = nfse.servico?.cTribNac || nfse.cTribNac || '';
+      const desc = nfse.servico?.descricao || nfse.servico?.xDescServ || nfse.descricaoServico || '';
+      servEl.innerText = ctn ? `${ctn} - ${desc}` : (desc || 'Sem descrição');
+    }
+
+    // Reset campos de entrada
+    const motivoSelect = document.getElementById('cancMotivoSelect');
+    if (motivoSelect) motivoSelect.value = '';
+
+    const justText = document.getElementById('cancJustificativaText');
+    if (justText) justText.value = '';
+
+    // Detalhes inicia fechado conforme o portal
+    const detBox = document.getElementById('cancDetalhesBox');
+    if (detBox) detBox.classList.add('hidden');
+    const detIcon = document.getElementById('cancDetalhesIcon');
+    if (detIcon) detIcon.innerText = '︾';
+    const detLabel = document.getElementById('cancDetalhesLabel');
+    if (detLabel) detLabel.innerText = 'Exibir detalhes da NFS-e';
+
+    const modal = document.getElementById('modalCancelamentoNfse');
+    if (modal) modal.classList.remove('hidden');
+  },
+
+  closeCancelamentoModal() {
+    const modal = document.getElementById('modalCancelamentoNfse');
+    if (modal) modal.classList.add('hidden');
+    this._cancNfseAtiva = null;
+  },
+
+  toggleCancelamentoDetalhes() {
+    const detBox = document.getElementById('cancDetalhesBox');
+    const detIcon = document.getElementById('cancDetalhesIcon');
+    const detLabel = document.getElementById('cancDetalhesLabel');
+    if (!detBox) return;
+
+    const isHidden = detBox.classList.contains('hidden');
+    if (isHidden) {
+      detBox.classList.remove('hidden');
+      if (detIcon) detIcon.innerText = '︽';
+      if (detLabel) detLabel.innerText = 'Ocultar detalhes da NFS-e';
+    } else {
+      detBox.classList.add('hidden');
+      if (detIcon) detIcon.innerText = '︾';
+      if (detLabel) detLabel.innerText = 'Exibir detalhes da NFS-e';
+    }
+  },
+
+  handleCancelMotivoChange(motivo) {
+    const justText = document.getElementById('cancJustificativaText');
+    if (!justText) return;
+
+    if (motivo === 'Erro na emissão') {
+      justText.placeholder = 'Descreva o erro ocorrido na emissão (ex: Erro no preenchimento de valores ou dados cadastrais)...';
+    } else if (motivo === 'Serviço não prestado') {
+      justText.placeholder = 'Descreva a motivação pelo não cumprimento ou cancelamento do serviço contratado...';
+    } else {
+      justText.placeholder = 'Descreva a justificativa detalhada do cancelamento (mínimo 15 caracteres)...';
+    }
+  },
+
+  async submitCancelamentoModal(event) {
+    if (event) event.preventDefault();
+    const nfse = this._cancNfseAtiva;
+    if (!nfse || !nfse.chaveAcesso) {
+      alert('Selecione uma nota fiscal para cancelar.');
+      return;
+    }
+
+    const motivo = document.getElementById('cancMotivoSelect')?.value;
+    const justificativa = (document.getElementById('cancJustificativaText')?.value || '').trim();
+
+    if (!motivo) {
+      alert('Selecione o motivo oficial do cancelamento.');
+      document.getElementById('cancMotivoSelect')?.focus();
+      return;
+    }
+
+    if (justificativa.length < 15) {
+      alert('A justificativa de cancelamento deve conter no mínimo 15 caracteres (exigência oficial da Receita Federal).');
+      document.getElementById('cancJustificativaText')?.focus();
+      return;
+    }
+
+    const btn = document.getElementById('btnConfirmarCancelamento');
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<span class="animate-spin inline-block text-xs mr-1">⌛</span> Transmitindo Cancelamento...`;
+    }
 
     try {
-      const res = await safeFetchJson(`/api/adn/nfse/${chaveAcesso}/cancelar`, {
+      const res = await safeFetchJson(`/api/adn/nfse/${nfse.chaveAcesso}/cancelar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ motivo, justificativa })
@@ -3497,16 +3637,23 @@ const App = {
       if (!res.success) {
         window.friendlyErrorModal.show(res.error);
       } else {
-        alert(res.mensagem);
+        this.closeCancelamentoModal();
+        alert(res.mensagem || 'NFS-e cancelada com sucesso no Ambiente Nacional!');
+        this.showToast('NFS-e cancelada com sucesso!');
         await this.loadHistory();
       }
     } catch (err) {
       window.friendlyErrorModal.show({
         title: 'Falha ao Cancelar NFS-e',
-        category: 'ADN Cancelamento',
-        message: 'Ocorreu um erro ao registrar o evento de cancelamento no ADN.',
+        category: 'SEFIN Nacional Cancelamento',
+        message: 'Ocorreu um erro ao transmitir o evento de cancelamento para o SEFIN Nacional.',
         technicalDetail: err.message
       });
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+      }
     }
   },
 

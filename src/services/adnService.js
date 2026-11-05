@@ -561,59 +561,192 @@ class AdnService {
   }
 
   /**
-   * Registra evento de cancelamento real de NFS-e no ADN
+   * Registra evento de cancelamento real de NFS-e no SEFIN Nacional / ADN
    */
-  async cancelarNfse(chaveAcesso, motivo, justificativa, envKey = 'HOMOLOGACAO') {
-    const env = ENVIRONMENTS[envKey] || ENVIRONMENTS.HOMOLOGACAO;
+  async cancelarNfse(chaveAcesso, motivo, justificativa, envKey = 'PRODUCAO') {
+    const env = ENVIRONMENTS[envKey] || ENVIRONMENTS.PRODUCAO;
     const certInfo = certService.activeCert;
 
-    const existing = storageService.getNfseByChave(chaveAcesso);
+    const cleanChave = (chaveAcesso || '').replace(/\D/g, '');
+    let existing = storageService.getNfseByChave(cleanChave) || storageService.getNfseByChave(chaveAcesso);
+    
+    // Se não encontrou no histórico local, tenta consultar diretamente no SEFIN Nacional
     if (!existing) {
-      throw new Error(`Nota fiscal com chave ${chaveAcesso} não encontrada no histórico local.`);
+      try {
+        const queryRes = await this.consultarNfsePorChave(cleanChave, envKey);
+        if (queryRes && queryRes.nfse) {
+          existing = queryRes.nfse;
+        }
+      } catch (qErr) {
+        console.warn('Tentativa de auto-consulta no SEFIN antes de cancelar falhou:', qErr.message);
+      }
+    }
+
+    if (!existing) {
+      throw new Error(`Nota fiscal com chave de acesso ${chaveAcesso} não encontrada.`);
     }
 
     if (existing.status === 'CANCELADA') {
-      throw new Error('Esta NFS-e já se encontra cancelada.');
+      return {
+        success: true,
+        mensagem: 'Esta NFS-e já se encontra cancelada no Ambiente Nacional!',
+        protocoloCancelamento: existing.motivoCancelamento || 'CANCELADA_CONFIRMADA',
+        nfse: existing
+      };
     }
 
     if (!certInfo || !certInfo.pfxBuffer) {
       throw translateError(new Error('Certificado digital A1 não carregado para assinar o evento de cancelamento.'), {
-        step: 'Cancelamento no ADN',
-        howToFix: ['Carregue o certificado A1 com chave privada para registrar o evento no ADN.']
+        step: 'Cancelamento no ADN / SEFIN Nacional',
+        howToFix: ['Carregue o certificado A1 com chave privada para registrar o evento oficial de cancelamento.']
       });
     }
 
-    try {
-      const httpsAgent = this.createHttpsAgent(certInfo);
-      const payload = {
-        tpEvento: '110111', // Código de Cancelamento CGNFS-e
-        xJust: justificativa || motivo,
-        cMotivo: motivo
-      };
+    // 1. Mapeamento oficial dos motivos conforme schema XSD da Receita Federal:
+    // 1 - Erro na emissão
+    // 2 - Serviço não prestado
+    // 9 - Outros
+    let codMotivo = '1';
+    let descMotivo = 'Erro na emissão';
+    const motivoStr = String(motivo || '').toLowerCase();
+    if (motivoStr === '2' || motivoStr.includes('serviço') || motivoStr.includes('prestado')) {
+      codMotivo = '2';
+      descMotivo = 'Serviço não prestado';
+    } else if (motivoStr === '9' || motivoStr === '3' || motivoStr.includes('outro')) {
+      codMotivo = '9';
+      descMotivo = 'Outros';
+    }
 
-      const response = await axios.post(`${env.rfbAdnBaseUrl}/nfse/${chaveAcesso}/eventos`, payload, {
+    let xMotivo = (justificativa || descMotivo).trim();
+    // XSD exige no mínimo 15 caracteres para xMotivo
+    if (xMotivo.length < 15) {
+      xMotivo = `${descMotivo} - ${xMotivo}`.padEnd(16, '.');
+    }
+    if (xMotivo.length > 255) {
+      xMotivo = xMotivo.substring(0, 255);
+    }
+
+    // 2. Monta o XML do evento de cancelamento (pedRegEvento) conforme padrão oficial SEFIN Nacional
+    const tpAmb = (env.tpAmb === 1 || envKey === 'PRODUCAO') ? 1 : 2;
+    const now = new Date();
+    const tzOffset = -now.getTimezoneOffset();
+    const diff = tzOffset >= 0 ? '+' : '-';
+    const pad = (n) => String(Math.floor(Math.abs(n))).padStart(2, '0');
+    const dhEvento = now.toISOString().replace(/\.\d{3}Z$/, '') + `${diff}${pad(tzOffset / 60)}:${pad(tzOffset % 60)}`;
+
+    const cleanCnpjAutor = (existing.prestador && (existing.prestador.cnpjRaw || (existing.prestador.cnpj && existing.prestador.cnpj.replace(/\D/g, '')))) || certInfo.docRaw;
+    const pedRegId = `PRE${cleanChave}`;
+    const autorTag = cleanCnpjAutor.length === 11 
+      ? `<CPFAutor>${cleanCnpjAutor}</CPFAutor>`
+      : `<CNPJAutor>${cleanCnpjAutor}</CNPJAutor>`;
+
+    const xmlUnsigned = `<?xml version="1.0" encoding="UTF-8"?>` +
+      `<pedRegEvento xmlns="http://www.sped.fazenda.gov.br/nfse" versao="1.00">` +
+        `<infPedReg Id="${pedRegId}">` +
+          `<tpAmb>${tpAmb}</tpAmb>` +
+          `<verAplic>EmissorNacional_1.0</verAplic>` +
+          `<dhEvento>${dhEvento}</dhEvento>` +
+          `${autorTag}` +
+          `<chNFSe>${cleanChave}</chNFSe>` +
+          `<nPedRegEvento>1</nPedRegEvento>` +
+          `<e101101>` +
+            `<xDesc>Cancelamento de NFS-e</xDesc>` +
+            `<cMotivo>${codMotivo}</cMotivo>` +
+            `<xMotivo>${xMotivo}</xMotivo>` +
+          `</e101101>` +
+        `</infPedReg>` +
+      `</pedRegEvento>`;
+
+    // 3. Assina digitalmente o nó infPedReg com o certificado digital ICP-Brasil
+    let signedXml = '';
+    try {
+      const signResult = signatureService.signXml(
+        xmlUnsigned,
+        'infPedReg',
+        pedRegId,
+        certInfo.keyPem,
+        certInfo.certPem
+      );
+      signedXml = signResult.signedXml;
+    } catch (sErr) {
+      console.warn('Erro ao assinar pedRegEvento com xml-crypto:', sErr.message);
+      throw translateError(sErr, { step: 'Assinatura Digital do Evento de Cancelamento' });
+    }
+
+    // 4. Compacta GZip + Base64 conforme especificação da SEFIN Nacional
+    const gzipB64 = zlib.gzipSync(Buffer.from(signedXml, 'utf8')).toString('base64');
+
+    // 5. Envia para o SEFIN Nacional via mTLS
+    const httpsAgent = this.createHttpsAgent(certInfo);
+    const sefinBase = env.rfbSefinBaseUrl || (envKey === 'PRODUCAO' ? 'https://sefin.nfse.gov.br/SefinNacional' : 'https://sefin.producaorestrita.nfse.gov.br/SefinNacional');
+    const endpoint = `${sefinBase}/nfse/${cleanChave}/eventos`;
+
+    try {
+      const response = await axios.post(endpoint, {
+        pedidoRegistroEventoXmlGZipB64: gzipB64,
+        eventoXmlGZipB64: gzipB64
+      }, {
         headers: {
           'Content-Type': 'application/json',
-          'X-Procurador-Cert': certInfo.docRaw
+          'Accept': 'application/json'
         },
         httpsAgent,
         timeout: env.timeoutMs
       });
 
+      const resData = response.data || {};
+      let protocoloCancelamento = resData.protocolo || resData.numeroProtocolo || resData.idEvento || null;
+
+      if (resData.eventoXmlGZipB64) {
+        try {
+          const retXml = zlib.gunzipSync(Buffer.from(resData.eventoXmlGZipB64, 'base64')).toString('utf8');
+          const protoMatch = retXml.match(/<(?:nProt|protocolo)>([^<]+)<\//i);
+          if (protoMatch) protocoloCancelamento = protoMatch[1];
+        } catch (_) {}
+      }
+
+      if (!protocoloCancelamento) {
+        protocoloCancelamento = `SEFIN-CANC-${Date.now()}`;
+      }
+
+      const motivoCompleto = `${descMotivo}: ${xMotivo}`;
       const cancelada = storageService.updateNfseStatus(
-        chaveAcesso,
+        cleanChave,
         'CANCELADA',
-        `${motivo}: ${justificativa}`
+        motivoCompleto
       );
 
       return {
         success: true,
         mensagem: 'NFS-e cancelada com sucesso no Ambiente de Dados Nacional!',
-        protocoloCancelamento: response.data.protocolo || response.data.protocoloEvento || 'ADN-EVT-CANC-' + Date.now(),
+        protocoloCancelamento,
         nfse: cancelada
       };
     } catch (err) {
-      throw translateError(err, { step: 'Cancelamento de NFS-e no ADN da Receita Federal' });
+      if (err.response && err.response.data) {
+        const errData = err.response.data;
+        let errMsg = '';
+        if (errData.mensagens && Array.isArray(errData.mensagens)) {
+          errMsg = errData.mensagens.map(m => `[${m.codigo || ''}] ${m.descricao || m.mensagem || ''}`).join('; ');
+        } else if (errData.mensagem || errData.error) {
+          errMsg = errData.mensagem || errData.error;
+        }
+
+        if (errMsg) {
+          // Se a SEFIN reportar que a nota já está cancelada
+          if (/já cancelada|ja cancelada|cancelamento homologado|já foi cancelada/i.test(errMsg)) {
+            const cancelada = storageService.updateNfseStatus(cleanChave, 'CANCELADA', `${descMotivo}: ${xMotivo}`);
+            return {
+              success: true,
+              mensagem: 'Esta NFS-e já se encontrava cancelada no Ambiente Nacional e seu status foi atualizado com sucesso!',
+              protocoloCancelamento: 'CONFIRMADO_SEFIN',
+              nfse: cancelada
+            };
+          }
+          throw translateError(new Error(errMsg), { step: 'Registro de Cancelamento no SEFIN Nacional' });
+        }
+      }
+      throw translateError(err, { step: 'Cancelamento de NFS-e no SEFIN Nacional' });
     }
   }
 
