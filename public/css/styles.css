@@ -88,15 +88,20 @@ html.dark .danfse-page-container {
 .danfse-document {
   border: 1px solid #000000 !important;
   width: 100%;
+  min-height: 275mm; /* Cobre a folha A4 completa de ponta a ponta */
   background: #ffffff !important;
   color: #000000 !important;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .danfse-table {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
+  height: 100%;
   background-color: #ffffff !important;
 }
 
@@ -206,7 +211,8 @@ html.dark .danfse-page-container {
 }
 
 .danfse-spacer {
-  height: 100px;
+  height: 100%;
+  min-height: 180px;
 }
 
 .danfse-watermark {
@@ -227,7 +233,7 @@ html.dark .danfse-page-container {
 }
 
 /* ========================================================
-   ESTILOS DE IMPRESSÃO - EXATAMENTE 1 PÁGINA A4 SEM BRANCO
+   ESTILOS DE IMPRESSÃO - COBRE A PÁGINA A4 TODA (1 PÁGINA EXATA)
    ======================================================== */
 @media print {
   @page {
@@ -239,7 +245,7 @@ html.dark .danfse-page-container {
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
-    height: auto !important;
+    height: 100% !important;
     background: #ffffff !important;
     color: #000000 !important;
     overflow: visible !important;
@@ -299,13 +305,20 @@ html.dark .danfse-page-container {
 
   .danfse-document {
     border: 1px solid #000000 !important;
+    height: 284mm !important;
+    min-height: 284mm !important;
+    max-height: 284mm !important;
     page-break-after: avoid !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
 
+  .danfse-table {
+    height: 100% !important;
+  }
+
   .danfse-spacer {
-    height: 70px !important;
+    height: 100% !important;
   }
 
   .no-print {
