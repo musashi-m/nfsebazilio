@@ -1,12 +1,15 @@
 /**
- * Visualizador Oficial do DANFSE (Documento Auxiliar da NFS-e Padrão Nacional)
- * Padrão Comitê Gestor da NFS-e (CGNFS-e) / Receita Federal do Brasil
+ * Visualizador Oficial do DANFSe v2.0 (Documento Auxiliar da NFS-e - Padrão Nacional)
+ * Padrão Comitê Gestor da NFS-e (CGNFS-e) / Receita Federal do Brasil (RFB) / SEFIN Nacional
+ * 
+ * Réplica fidedigna do DANFSe v2.0 emitido pelo Portal de Gestão da NFS-e (nfse.gov.br)
  */
 
 class DanfseViewer {
   constructor() {
     this.modalEl = null;
     this.currentNfse = null;
+    this.currentChave = null;
     this.init();
   }
 
@@ -14,33 +17,40 @@ class DanfseViewer {
     if (!document.getElementById('danfseModal')) {
       const container = document.createElement('div');
       container.id = 'danfseModal';
-      container.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm hidden overflow-y-auto';
+      container.className = 'fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-sm hidden overflow-y-auto';
       container.innerHTML = `
-        <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full border border-slate-300 my-8 flex flex-col max-h-[92vh] overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-5xl w-full border border-slate-300 my-4 sm:my-8 flex flex-col max-h-[96vh] overflow-hidden">
           <!-- Barra de Ações Superior (Não sai na impressão) -->
-          <div class="no-print px-6 py-3.5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
-            <div class="flex items-center space-x-2">
-              <span class="w-3 h-3 rounded-full bg-emerald-400"></span>
-              <span class="font-bold text-sm tracking-wide">DANFSE NACIONAL • VISUALIZAÇÃO OFICIAL</span>
+          <div class="no-print px-4 sm:px-6 py-3 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3 border-b border-slate-800">
+            <div class="flex items-center space-x-2.5">
+              <span class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></span>
+              <div>
+                <span class="font-bold text-xs sm:text-sm tracking-wide block">DANFSe v2.0 • DOCUMENTO AUXILIAR DA NFS-e</span>
+                <span class="text-[10px] text-slate-400">Padrão Nacional CGNFS-e / Receita Federal</span>
+              </div>
             </div>
             <div class="flex items-center space-x-2">
-              <button onclick="window.danfseViewer.downloadXml()" class="px-3 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg flex items-center space-x-1 transition-colors">
-                <i data-lucide="file-code" class="w-4 h-4"></i>
-                <span>Baixar XML Oficial</span>
+              <button onclick="window.danfseViewer.copyChave()" id="btnDanfseCopyChave" class="px-3 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg flex items-center space-x-1.5 transition-colors border border-slate-700">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                <span id="btnDanfseCopyText">Copiar Chave</span>
+              </button>
+              <button onclick="window.danfseViewer.downloadXml()" class="px-3 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg flex items-center space-x-1.5 transition-colors border border-slate-700">
+                <i data-lucide="file-code" class="w-3.5 h-3.5"></i>
+                <span>Baixar XML</span>
               </button>
               <button onclick="window.danfseViewer.print()" class="px-4 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg flex items-center space-x-1.5 shadow-sm transition-colors">
                 <i data-lucide="printer" class="w-4 h-4"></i>
                 <span>Imprimir / Salvar PDF</span>
               </button>
-              <button onclick="window.danfseViewer.close()" class="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors">
+              <button onclick="window.danfseViewer.close()" class="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors ml-1">
                 <i data-lucide="x" class="w-5 h-5"></i>
               </button>
             </div>
           </div>
 
-          <!-- Área do DANFSE Formatado (Área imprimível) -->
-          <div id="danfsePrintArea" class="p-8 overflow-y-auto bg-slate-50 text-slate-900 text-xs font-sans leading-snug">
-            <div id="danfseRenderTarget" class="bg-white p-6 border border-slate-300 shadow-sm max-w-3xl mx-auto space-y-4">
+          <!-- Área do DANFSe Oficial (Área imprimível) -->
+          <div id="danfsePrintArea" class="p-2 sm:p-6 overflow-y-auto bg-slate-200 text-slate-900 font-sans">
+            <div id="danfseRenderTarget" class="danfse-page-container mx-auto">
               <!-- Conteúdo gerado dinamicamente -->
             </div>
           </div>
@@ -53,6 +63,7 @@ class DanfseViewer {
   }
 
   show(nfse) {
+    if (!nfse) return;
     this.init();
     this.currentNfse = nfse;
     this.renderDanfse(nfse);
@@ -70,225 +81,796 @@ class DanfseViewer {
     window.print();
   }
 
+  copyChave() {
+    if (!this.currentChave) return;
+    navigator.clipboard.writeText(this.currentChave).then(() => {
+      const txt = document.getElementById('btnDanfseCopyText');
+      if (txt) {
+        const old = txt.textContent;
+        txt.textContent = 'Copiada!';
+        setTimeout(() => { txt.textContent = old; }, 2000);
+      }
+    }).catch(err => {
+      console.warn('Erro ao copiar chave:', err);
+    });
+  }
+
   downloadXml() {
     if (this.currentNfse && this.currentNfse.chaveAcesso) {
       window.location.href = `/api/adn/nfse/${this.currentNfse.chaveAcesso}/xml`;
     }
   }
 
-  formatChave(chave) {
-    if (!chave) return '';
-    return chave.replace(/(\d{4})/g, '$1 ').trim();
+  // ========================================================
+  // FORMATADORES OFICIAIS
+  // ========================================================
+  formatCpfCnpj(doc) {
+    if (!doc || doc === '-') return '-';
+    const s = String(doc).replace(/\D/g, '');
+    if (s.length === 14) return s.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+    if (s.length === 11) return s.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+    return doc;
   }
 
-  formatCurrency(val) {
-    const num = parseFloat(val) || 0;
-    return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  formatCep(cep) {
+    if (!cep || cep === '-') return '-';
+    const s = String(cep).replace(/\D/g, '');
+    if (s.length === 8) return s.replace(/^(\d{2})(\d{3})(\d{3})$/, '$1.$2-$3');
+    return cep;
   }
 
-  formatDate(iso) {
-    if (!iso) return '-';
+  formatIbge(code) {
+    if (!code || code === '-') return '-';
+    const s = String(code).replace(/\D/g, '');
+    if (s.length === 7) return s.replace(/^(\d{2})(\d{5})$/, '$1.$2');
+    return code;
+  }
+
+  formatPhone(phone) {
+    if (!phone || phone === '-') return '-';
+    const s = String(phone).replace(/\D/g, '');
+    if (s.length === 10) return s.replace(/^(\d{2})(\d{4})(\d{4})$/, '($1) $2-$3');
+    if (s.length === 11) return s.replace(/^(\d{2})(\d{5})(\d{4})$/, '($1) $2-$3');
+    return phone;
+  }
+
+  formatCtn(code) {
+    if (!code || code === '-') return '-';
+    const s = String(code).replace(/\D/g, '');
+    if (s.length === 6) return s.replace(/^(\d{2})(\d{2})(\d{2})$/, '$1.$2.$3');
+    return code;
+  }
+
+  formatDate(dStr) {
+    if (!dStr || dStr === '-') return '-';
     try {
-      const d = new Date(iso);
-      return d.toLocaleString('pt-BR');
+      if (dStr.includes('T')) {
+        const [d] = dStr.split('T');
+        const [y, m, day] = d.split('-');
+        return `${day}/${m}/${y}`;
+      }
+      if (dStr.includes('-')) {
+        const parts = dStr.split('-');
+        if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+      const dt = new Date(dStr);
+      return dt.toLocaleDateString('pt-BR');
     } catch {
-      return iso;
+      return dStr;
     }
   }
 
+  formatDateTime(dtStr) {
+    if (!dtStr || dtStr === '-') return '-';
+    try {
+      if (dtStr.includes('T')) {
+        const [dPart, tPart] = dtStr.split('T');
+        const [y, m, day] = dPart.split('-');
+        const time = tPart.split('-')[0].split('+')[0];
+        return `${day}/${m}/${y} ${time}`;
+      }
+      const dt = new Date(dtStr);
+      return dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR');
+    } catch {
+      return dtStr;
+    }
+  }
+
+  formatCurrency(val, defaultDash = true) {
+    if (val === null || val === undefined || val === '') return defaultDash ? '-' : 'R$ 0,00';
+    const num = parseFloat(val);
+    if (isNaN(num)) return defaultDash ? '-' : 'R$ 0,00';
+    if (num === 0 && defaultDash) return '-';
+    return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
+
+  // ========================================================
+  // EXTRATOR INTELIGENTE DOS CAMPOS DO XML / OBJETO
+  // ========================================================
+  extractData(nfse) {
+    const xmlStr = nfse.xmlAssinado || nfse.xmlCompleto || '';
+    let xmlDoc = null;
+    if (xmlStr && typeof window !== 'undefined' && window.DOMParser) {
+      try {
+        const parsed = new DOMParser().parseFromString(xmlStr, 'text/xml');
+        if (!parsed.querySelector('parsererror')) {
+          xmlDoc = parsed;
+        }
+      } catch (e) {
+        console.warn('Erro ao parsear XML da NFS-e:', e);
+      }
+    }
+
+    const getXml = (tag) => {
+      if (!xmlDoc) return null;
+      const elems = xmlDoc.getElementsByTagName(tag);
+      if (elems && elems.length > 0 && elems[0].textContent) {
+        return elems[0].textContent.trim();
+      }
+      return null;
+    };
+
+    // Chave de Acesso
+    let chave = getXml('infNFSe')?.getAttribute?.('Id')?.replace('NFS', '') || nfse.chaveAcesso || '';
+    if (chave.startsWith('NFS')) chave = chave.substring(3);
+
+    // Identificação NFS-e e DPS
+    const numNfse = getXml('nNFSe') || nfse.numeroNfse || '1';
+    const dCompet = getXml('dCompet') || nfse.dataEmissao;
+    const dhProc = getXml('dhProc') || nfse.dataAutorizacao || nfse.dataEmissao;
+    const numDps = getXml('nDPS') || nfse.numeroDps || '-';
+    const serieRaw = getXml('serie') || String(nfse.serie || '1');
+    const serieDps = isNaN(parseInt(serieRaw, 10)) ? serieRaw : String(parseInt(serieRaw, 10));
+    const dhEmi = getXml('dhEmi') || nfse.dataEmissao;
+    const emitente = 'Prestador';
+    const isCancelada = nfse.status === 'CANCELADA';
+    const situacao = isCancelada ? 'NFS-e Cancelada' : 'NFS-e Gerada';
+    const finalidade = '-';
+
+    // Município emissor e ambiente
+    const xLocEmi = getXml('xLocEmi') || nfse.prestador?.municipio || 'Aracaju';
+    const ambGer = getXml('ambGer') || '2';
+    const tpAmb = getXml('tpAmb') || (nfse.ambiente === 'TESTE' || nfse.tpAmb === 2 ? '2' : '1');
+
+    // Prestador
+    const prestCnpj = getXml('CNPJ') || nfse.prestador?.cnpj || nfse.prestador?.cnpjRaw || '';
+    const prestNome = getXml('xNome') || nfse.prestador?.razaoSocial || '';
+    const prestIm = getXml('IM') || nfse.prestador?.im || '-';
+    const prestFone = getXml('fone') || nfse.prestador?.telefone || '(79) 3222-9095';
+    const prestUf = getXml('UF') || nfse.prestador?.uf || 'SE';
+    const prestMunIbge = getXml('cLocEmi') || getXml('cMun') || '2800308';
+    const prestCep = getXml('CEP') || nfse.prestador?.cep || '49025360';
+    const prestEmail = getXml('email') || nfse.prestador?.email || 'BAZILIOCONTABILIDADE@GMAIL.COM';
+
+    // Endereço prestador
+    let prestEnd = '';
+    const prestLgr = getXml('xLgr');
+    const prestNro = getXml('nro');
+    const prestBairro = getXml('xBairro');
+    if (prestLgr && prestNro) {
+      prestEnd = `${prestLgr}, ${prestNro}${getXml('xCpl') ? ' ' + getXml('xCpl') : ''}, ${prestBairro || ''}`.trim();
+    } else {
+      prestEnd = nfse.prestador?.endereco || 'RUA JOVENTINA ALVES, 774, GRAGERU';
+    }
+
+    // Regimes Prestador
+    const opSimpNac = getXml('opSimpNac') || '3';
+    let simplesNacText = 'Optante - Microempresa ou Empresa de Pequeno Porte (ME/EPP)';
+    if (opSimpNac === '1') simplesNacText = 'Não Optante';
+    else if (opSimpNac === '2') simplesNacText = 'Optante - Microempreendedor Individual (MEI)';
+
+    const regApTribSN = getXml('regApTribSN') || '1';
+    let regApSNText = 'Regime de apuração dos tributos federais e municipal pelo Simples Nacional';
+    if (regApTribSN === '2') regApSNText = 'Regime de apuração dos tributos federais pelo Simples Nacional e municipal pelo regime normal (fixo)';
+    else if (regApTribSN === '3') regApSNText = 'Regime de apuração dos tributos federais e municipal pela NFS-e';
+
+    // Tomador
+    let tomaDoc = '';
+    let tomaNome = '';
+    let tomaIm = '-';
+    let tomaFone = '-';
+    let tomaMun = '';
+    let tomaUf = '';
+    let tomaMunIbge = '';
+    let tomaCep = '';
+    let tomaEnd = '';
+    let tomaEmail = '-';
+
+    // Tenta extrair do bloco toma do XML
+    if (xmlDoc) {
+      const tomaEl = xmlDoc.getElementsByTagName('toma')[0];
+      if (tomaEl) {
+        const c = tomaEl.getElementsByTagName('CNPJ')[0] || tomaEl.getElementsByTagName('CPF')[0];
+        if (c) tomaDoc = c.textContent.trim();
+        const n = tomaEl.getElementsByTagName('xNome')[0];
+        if (n) tomaNome = n.textContent.trim();
+        const im = tomaEl.getElementsByTagName('IM')[0];
+        if (im) tomaIm = im.textContent.trim();
+        const f = tomaEl.getElementsByTagName('fone')[0];
+        if (f) tomaFone = f.textContent.trim();
+        const em = tomaEl.getElementsByTagName('email')[0];
+        if (em) tomaEmail = em.textContent.trim();
+
+        const endNac = tomaEl.getElementsByTagName('endNac')[0];
+        if (endNac) {
+          const cm = endNac.getElementsByTagName('cMun')[0];
+          if (cm) tomaMunIbge = cm.textContent.trim();
+          const cp = endNac.getElementsByTagName('CEP')[0];
+          if (cp) tomaCep = cp.textContent.trim();
+        }
+        const lgr = tomaEl.getElementsByTagName('xLgr')[0];
+        const nro = tomaEl.getElementsByTagName('nro')[0];
+        const br = tomaEl.getElementsByTagName('xBairro')[0];
+        if (lgr && nro) {
+          tomaEnd = `${lgr.textContent.trim()}, ${nro.textContent.trim()}${br ? ', ' + br.textContent.trim() : ''}`;
+        }
+      }
+    }
+
+    // Fallbacks para tomador
+    if (!tomaDoc) tomaDoc = nfse.tomador?.doc || nfse.tomador?.docRaw || '-';
+    if (!tomaNome) tomaNome = nfse.tomador?.nome || '-';
+    if (!tomaMunIbge) tomaMunIbge = nfse.tomador?.municipioIbge || '';
+    if (!tomaCep) tomaCep = nfse.tomador?.cep || '';
+    if (!tomaEnd) {
+      if (nfse.tomador?.logradouro) {
+        tomaEnd = `${nfse.tomador.logradouro}, ${nfse.tomador.numero || 'S/N'}${nfse.tomador.bairro ? ', ' + nfse.tomador.bairro : ''}`;
+      } else {
+        tomaEnd = '-';
+      }
+    }
+    if (!tomaEmail || tomaEmail === '-') tomaEmail = nfse.tomador?.email || '-';
+    if (!tomaFone || tomaFone === '-') tomaFone = nfse.tomador?.telefone || '-';
+
+    // Lookup cidade e UF do tomador por IBGE
+    if (tomaMunIbge && window.MUNICIPIOS_BRASIL) {
+      const found = window.MUNICIPIOS_BRASIL.find(m => String(m.id) === String(tomaMunIbge));
+      if (found) {
+        tomaMun = found.nome;
+        tomaUf = found.uf;
+      }
+    }
+    if (!tomaMun) tomaMun = nfse.tomador?.municipio || 'Brusque';
+    if (!tomaUf) tomaUf = nfse.tomador?.uf || 'SC';
+
+    // Serviço Prestado
+    const cTribNac = getXml('cTribNac') || nfse.servico?.cTribNac || '';
+    const xTribNac = getXml('xTribNac') || 'Propaganda e publicidade, inclusive promoção de vendas, planejamento de campanhas ou sistemas de publicidade, elaboração de desenhos, textos e demais materiais publicitários.';
+    const xDescServ = getXml('xDescServ') || nfse.servico?.descricao || '';
+    const xLocPrestacao = getXml('xLocPrestacao') || xLocEmi;
+
+    // Tributação Municipal (ISSQN)
+    const tribISSQN = getXml('tribISSQN') || '1';
+    let tipoTribISS = 'Operação Tributável';
+    if (tribISSQN === '2') tipoTribISS = 'Exportação de Serviço';
+    else if (tribISSQN === '3') tipoTribISS = 'Não Incidência';
+    else if (tribISSQN === '4') tipoTribISS = 'Imunidade';
+
+    const xLocIncid = getXml('xLocIncid') || xLocEmi;
+    const tpRetISSQN = getXml('tpRetISSQN') || (nfse.valores?.issRetido ? '2' : '1');
+    const retencaoIss = tpRetISSQN === '2' ? 'Retido' : 'Não Retido';
+
+    // Valores
+    const vServ = getXml('vServ') || nfse.valores?.vServ || nfse.valores?.valorServico || 0;
+    const vLiq = getXml('vLiq') || nfse.valores?.vLiquido || nfse.valores?.valorLiquido || vServ;
+    const pAliq = getXml('pAliq') || nfse.valores?.pAliq || (nfse.valores?.iss?.aliquota ? nfse.valores.iss.aliquota : null);
+    const vIss = getXml('vISS') || nfse.valores?.vIss || (nfse.valores?.iss?.valorIss ? nfse.valores.iss.valorIss : null);
+
+    // Retenções Federais
+    const vPis = nfse.valores?.vPis || null;
+    const vCofins = nfse.valores?.vCofins || null;
+    const vInss = nfse.valores?.vInss || null;
+    const vIr = nfse.valores?.vIr || null;
+    const vCsll = nfse.valores?.vCsll || null;
+
+    // Informações complementares
+    const pTotTribSN = getXml('pTotTribSN') || '6.00';
+    let infoComp = `Totais aproximados dos Tributos cfe. Lei nº 12.741/2012: Federais: -; Estaduais: -; Municipais: -;`;
+
+    return {
+      chave,
+      numNfse,
+      dCompet,
+      dhProc,
+      numDps,
+      serieDps,
+      dhEmi,
+      emitente,
+      isCancelada,
+      situacao,
+      finalidade,
+      xLocEmi,
+      ambGer,
+      tpAmb,
+      prestCnpj,
+      prestNome,
+      prestIm,
+      prestFone,
+      prestUf,
+      prestMunIbge,
+      prestCep,
+      prestEnd,
+      prestEmail,
+      simplesNacText,
+      regApSNText,
+      tomaDoc,
+      tomaNome,
+      tomaIm,
+      tomaFone,
+      tomaMun,
+      tomaUf,
+      tomaMunIbge,
+      tomaCep,
+      tomaEnd,
+      tomaEmail,
+      cTribNac,
+      xTribNac,
+      xDescServ,
+      xLocPrestacao,
+      tipoTribISS,
+      xLocIncid,
+      retencaoIss,
+      vServ,
+      vLiq,
+      pAliq,
+      vIss,
+      vPis,
+      vCofins,
+      vInss,
+      vIr,
+      vCsll,
+      pTotTribSN,
+      infoComp
+    };
+  }
+
+  // ========================================================
+  // RENDERIZAÇÃO DO DOCUMENTO OFICIAL DANFSe v2.0
+  // ========================================================
   renderDanfse(nfse) {
     const target = document.getElementById('danfseRenderTarget');
-    const isCancelada = nfse.status === 'CANCELADA';
-    const isTeste = nfse.ambiente === 'TESTE';
-    const chaveFormatada = this.formatChave(nfse.chaveAcesso);
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=https://www.nfse.gov.br/consultapublica/danfse?chave=${nfse.chaveAcesso}`;
+    if (!target) return;
+
+    const data = this.extractData(nfse);
+    this.currentChave = data.chave;
+
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=95x95&data=https://www.nfse.gov.br/consultapublica/danfse?chave=${data.chave}`;
 
     target.innerHTML = `
-      <!-- Cabeçalho Oficial -->
-      <div class="border border-slate-800 p-3 relative">
-        ${isCancelada ? '<div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20 transform -rotate-12"><span class="text-6xl font-black text-rose-600 border-8 border-rose-600 px-6 py-2 uppercase">CANCELADA</span></div>' : ''}
-        ${isTeste ? '<div class="absolute top-1 right-2"><span class="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 border border-amber-300">SEM VALOR FISCAL - AMBIENTE DE TESTE</span></div>' : ''}
-        
-        <div class="flex items-center justify-between pb-2 border-b border-slate-300">
-          <div class="flex items-center space-x-3">
-            <div class="w-12 h-12 flex items-center justify-center bg-slate-100 border border-slate-300 rounded font-bold text-slate-700 text-lg">
-              RFB
-            </div>
-            <div>
-              <h1 class="text-sm font-extrabold uppercase text-slate-900 tracking-wide">Documento Auxiliar da NFS-e Nacional (DANFSE)</h1>
-              <p class="text-[11px] text-slate-600">Ambiente de Dados Nacional • Receita Federal do Brasil</p>
-            </div>
-          </div>
-          <div class="text-right">
-            <span class="text-[10px] text-slate-500 block">NÚMERO DA NFS-e</span>
-            <span class="text-base font-extrabold text-slate-900 font-mono">${nfse.numeroNfse || '-'}</span>
-          </div>
-        </div>
+      <div class="danfse-document relative">
+        ${data.isCancelada ? '<div class="danfse-watermark">CANCELADA</div>' : ''}
 
-        <!-- Chave de Acesso e QR Code -->
-        <div class="grid grid-cols-4 gap-3 pt-3 items-center">
-          <div class="col-span-3 space-y-1.5">
-            <div>
-              <span class="text-[10px] text-slate-500 font-semibold uppercase block">Chave de Acesso da NFS-e Nacional</span>
-              <span class="font-mono text-xs font-bold text-slate-900 tracking-wider bg-slate-50 px-2 py-1 border border-slate-200 block">${chaveFormatada}</span>
-            </div>
-            <div class="grid grid-cols-3 gap-2 text-[11px]">
-              <div>
-                <span class="text-slate-500 block text-[10px]">Data/Hora Emissão:</span>
-                <span class="font-semibold">${this.formatDate(nfse.dataEmissao)}</span>
+        <table class="danfse-table">
+          <colgroup>
+            <col style="width: 25%;">
+            <col style="width: 25%;">
+            <col style="width: 25%;">
+            <col style="width: 25%;">
+          </colgroup>
+
+          <!-- 1. CABEÇALHO OFICIAL (TOPO) -->
+          <tr>
+            <td style="text-align: center; vertical-align: middle; padding: 3px;">
+              <img src="/img/nfse_logo_oficial.png" alt="NFS-e Nacional" style="max-height: 36px; max-width: 95%; display: block; margin: auto;">
+            </td>
+            <td colspan="2" style="text-align: center; vertical-align: middle; padding: 2px;">
+              <div class="danfse-title-main">DANFSe v2.0</div>
+              <div class="danfse-title-sub">Documento Auxiliar da NFS-e</div>
+            </td>
+            <td style="font-size: 7pt; vertical-align: middle; padding: 3px 5px; line-height: 1.35;">
+              <div><strong>Município:</strong> ${data.xLocEmi} - ${data.prestUf}</div>
+              <div><strong>Ambiente Gerador:</strong> ${data.ambGer}</div>
+              <div><strong>Tipo de Ambiente:</strong> ${data.tpAmb}</div>
+            </td>
+          </tr>
+
+          <!-- 2. CHAVE DE ACESSO -->
+          <tr>
+            <td colspan="4" style="padding: 2px 4px;">
+              <span class="danfse-lbl">CHAVE DE ACESSO DA NFS-e</span>
+              <div class="danfse-chave-num">${data.chave}</div>
+            </td>
+          </tr>
+
+          <!-- 2.1 IDENTIFICAÇÃO NFS-e / DPS / SITUAÇÃO + QR CODE -->
+          <tr>
+            <td colspan="3" style="padding: 0; border: none;">
+              <table class="danfse-table" style="height: 100%;">
+                <colgroup>
+                  <col style="width: 33.33%;">
+                  <col style="width: 33.33%;">
+                  <col style="width: 33.34%;">
+                </colgroup>
+                <tr>
+                  <td>
+                    <span class="danfse-lbl">NÚMERO DA NFS-e</span>
+                    <div class="danfse-val danfse-val-bold" style="font-size: 8.5pt;">${data.numNfse}</div>
+                  </td>
+                  <td>
+                    <span class="danfse-lbl">COMPETÊNCIA DA NFS-e</span>
+                    <div class="danfse-val">${this.formatDate(data.dCompet)}</div>
+                  </td>
+                  <td>
+                    <span class="danfse-lbl">DATA E HORA DA EMISSÃO DA NFS-e</span>
+                    <div class="danfse-val">${this.formatDateTime(data.dhProc)}</div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <span class="danfse-lbl">NÚMERO DA DPS</span>
+                    <div class="danfse-val danfse-val-bold" style="font-size: 8.5pt;">${data.numDps}</div>
+                  </td>
+                  <td>
+                    <span class="danfse-lbl">SÉRIE DA DPS</span>
+                    <div class="danfse-val">${data.serieDps}</div>
+                  </td>
+                  <td>
+                    <span class="danfse-lbl">DATA E HORA DA EMISSÃO DA DPS</span>
+                    <div class="danfse-val">${this.formatDateTime(data.dhEmi)}</div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <span class="danfse-lbl">EMITENTE DA NFS-e</span>
+                    <div class="danfse-val">${data.emitente}</div>
+                  </td>
+                  <td>
+                    <span class="danfse-lbl">SITUAÇÃO DA NFS-e</span>
+                    <div class="danfse-val ${data.isCancelada ? 'text-rose-600 font-bold' : ''}">${data.situacao}</div>
+                  </td>
+                  <td>
+                    <span class="danfse-lbl">FINALIDADE</span>
+                    <div class="danfse-val">${data.finalidade}</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+            <td style="text-align: center; vertical-align: middle; padding: 2px;">
+              <img src="${qrCodeUrl}" alt="QR Code" style="width: 78px; height: 78px; display: block; margin: 0 auto;">
+              <div class="danfse-qr-text">A autenticidade desta NFS-e pode ser verificada pela leitura deste código QR ou pela consulta da chave de acesso no portal nacional da NFS-e</div>
+            </td>
+          </tr>
+
+          <!-- 3. PRESTADOR / FORNECEDOR -->
+          <tr>
+            <td class="danfse-bg-gray" style="vertical-align: middle;">
+              <div class="danfse-sec-title">PRESTADOR / FORNECEDOR</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">CNPJ / CPF / NIF</span>
+              <div class="danfse-val">${this.formatCpfCnpj(data.prestCnpj)}</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Indicador Municipal (Inscrição)</span>
+              <div class="danfse-val">${data.prestIm}</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Telefone</span>
+              <div class="danfse-val">${this.formatPhone(data.prestFone)}</div>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2">
+              <span class="danfse-lbl">Nome / Nome Empresarial</span>
+              <div class="danfse-val danfse-val-bold">${data.prestNome}</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Município / Sigla UF</span>
+              <div class="danfse-val">${data.xLocEmi} / ${data.prestUf}</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Código IBGE / CEP</span>
+              <div class="danfse-val">${this.formatIbge(data.prestMunIbge)} / ${this.formatCep(data.prestCep)}</div>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2">
+              <span class="danfse-lbl">Endereço</span>
+              <div class="danfse-val">${data.prestEnd}</div>
+            </td>
+            <td colspan="2">
+              <span class="danfse-lbl">E-mail</span>
+              <div class="danfse-val">${data.prestEmail}</div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <span class="danfse-lbl">Simples Nacional na Data de Competência</span>
+              <div class="danfse-val" style="font-size: 6.5pt;">${data.simplesNacText}</div>
+            </td>
+            <td colspan="3">
+              <span class="danfse-lbl">Regime de Apuração Tributária pelo SN</span>
+              <div class="danfse-val" style="font-size: 6.5pt;">${data.regApSNText}</div>
+            </td>
+          </tr>
+
+          <!-- 4. TOMADOR / ADQUIRENTE -->
+          <tr>
+            <td class="danfse-bg-gray" style="vertical-align: middle;">
+              <div class="danfse-sec-title">TOMADOR / ADQUIRENTE</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">CNPJ / CPF / NIF</span>
+              <div class="danfse-val">${this.formatCpfCnpj(data.tomaDoc)}</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Indicador Municipal (Inscrição)</span>
+              <div class="danfse-val">${data.tomaIm}</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Telefone</span>
+              <div class="danfse-val">${this.formatPhone(data.tomaFone)}</div>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2">
+              <span class="danfse-lbl">Nome / Nome Empresarial</span>
+              <div class="danfse-val danfse-val-bold">${data.tomaNome}</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Município / Sigla UF</span>
+              <div class="danfse-val">${data.tomaMun} / ${data.tomaUf}</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Código IBGE / CEP</span>
+              <div class="danfse-val">${this.formatIbge(data.tomaMunIbge)} / ${this.formatCep(data.tomaCep)}</div>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2">
+              <span class="danfse-lbl">Endereço</span>
+              <div class="danfse-val">${data.tomaEnd}</div>
+            </td>
+            <td colspan="2">
+              <span class="danfse-lbl">E-mail</span>
+              <div class="danfse-val">${data.tomaEmail}</div>
+            </td>
+          </tr>
+
+          <!-- 5. DESTINATÁRIO E INTERMEDIÁRIO -->
+          <tr>
+            <td colspan="4" class="danfse-bar-neutral">DESTINATÁRIO DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e</td>
+          </tr>
+          <tr>
+            <td colspan="4" class="danfse-bar-neutral">INTERMEDIÁRIO DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e</td>
+          </tr>
+
+          <!-- 6. SERVIÇO PRESTADO -->
+          <tr>
+            <td class="danfse-bg-gray" style="vertical-align: middle;">
+              <div class="danfse-sec-title">SERVIÇO PRESTADO</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Código de Tributação Nacional/Municipal</span>
+              <div class="danfse-val">${this.formatCtn(data.cTribNac)} / -</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Código da NBS</span>
+              <div class="danfse-val">-</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Local da Prestação / Sigla UF / País</span>
+              <div class="danfse-val">${data.xLocPrestacao} / ${data.prestUf} / -</div>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="4" style="padding: 2px 4px;">
+              <div class="danfse-desc-ctn">${data.xTribNac}</div>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="4" style="padding: 2px 4px;">
+              <span class="danfse-lbl">Descrição do Serviço</span>
+              <div class="danfse-desc-serv">${data.xDescServ}</div>
+            </td>
+          </tr>
+
+          <!-- 7. TRIBUTAÇÃO MUNICIPAL (ISSQN) -->
+          <tr>
+            <td class="danfse-bg-gray" style="vertical-align: middle;">
+              <div class="danfse-sec-title">TRIBUTAÇÃO MUNICIPAL (ISSQN)</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Tipo de Tributação do ISSQN</span>
+              <div class="danfse-val">${data.tipoTribISS}</div>
+            </td>
+            <td colspan="2">
+              <span class="danfse-lbl">Município / Sigla UF / País de Incidência do ISSQN</span>
+              <div class="danfse-val">${data.xLocIncid} / ${data.prestUf} / -</div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <span class="danfse-lbl">BC ISSQN</span>
+              <div class="danfse-val">-</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Alíquota Aplicada</span>
+              <div class="danfse-val">${data.pAliq ? data.pAliq + '%' : '-'}</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Retenção do ISSQN</span>
+              <div class="danfse-val">${data.retencaoIss}</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">ISSQN Apurado</span>
+              <div class="danfse-val">${this.formatCurrency(data.vIss)}</div>
+            </td>
+          </tr>
+
+          <!-- 8. TRIBUTAÇÃO FEDERAL (EXCETO CBS) -->
+          <tr>
+            <td class="danfse-bg-gray" style="vertical-align: middle;">
+              <div class="danfse-sec-title">TRIBUTAÇÃO FEDERAL (EXCETO CBS)</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">IRRF</span>
+              <div class="danfse-val">${this.formatCurrency(data.vIr)}</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Contribuição Previdenciária - Retida</span>
+              <div class="danfse-val">${this.formatCurrency(data.vInss)}</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Contribuições Sociais - Retidas</span>
+              <div class="danfse-val">${this.formatCurrency(data.vCsll)}</div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <span class="danfse-lbl">PIS - Débito Apuração Própria</span>
+              <div class="danfse-val">${this.formatCurrency(data.vPis)}</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">COFINS - Débito Apuração Própria</span>
+              <div class="danfse-val">${this.formatCurrency(data.vCofins)}</div>
+            </td>
+            <td colspan="2">
+              <span class="danfse-lbl">Descrição Contrib. Sociais - Retidas</span>
+              <div class="danfse-val">-</div>
+            </td>
+          </tr>
+
+          <!-- 9. TRIBUTAÇÃO IBS/CBS -->
+          <tr>
+            <td class="danfse-bg-gray" style="vertical-align: middle;">
+              <div class="danfse-sec-title">TRIBUTAÇÃO IBS/CBS</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">CST / cClassTrib</span>
+              <div class="danfse-val">- / -</div>
+            </td>
+            <td colspan="2">
+              <span class="danfse-lbl">Indicador de Operação / Código IBGE Incidência / Município Incidência / Sigla UF</span>
+              <div class="danfse-val">- / - / - / -</div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <span class="danfse-lbl">Exclusões e Reduções da Base de Cálculo</span>
+              <div class="danfse-val">R$ 0,00</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Base de Cálculo Após Exclusões e Reduções</span>
+              <div class="danfse-val">-</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Red. Alíquota IBS / Red. Alíquota CBS</span>
+              <div class="danfse-val">- / - / -</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Alíquota - IBS UF / IBS Mun</span>
+              <div class="danfse-val">- / -</div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <span class="danfse-lbl">Alíq. Efetiva Municipal - IBS</span>
+              <div class="danfse-val">-</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Valor Apurado Municipal - IBS</span>
+              <div class="danfse-val">-</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Alíq. Efetiva Estadual - IBS</span>
+              <div class="danfse-val">-</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Valor Apurado Estadual - IBS</span>
+              <div class="danfse-val">-</div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <span class="danfse-lbl">Valor Total Apurado - IBS</span>
+              <div class="danfse-val">-</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Alíquota - CBS</span>
+              <div class="danfse-val">-</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Alíquota Efetiva - CBS</span>
+              <div class="danfse-val">-</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Valor Total Apurado - CBS</span>
+              <div class="danfse-val">-</div>
+            </td>
+          </tr>
+
+          <!-- 10. VALOR TOTAL DA NFS-E -->
+          <tr>
+            <td class="danfse-bg-gray" style="vertical-align: middle;">
+              <div class="danfse-sec-title">VALOR TOTAL DA NFS-e</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">VALOR DA OPERAÇÃO / SERVIÇO</span>
+              <div class="danfse-val danfse-val-bold">${this.formatCurrency(data.vServ, false)}</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Desconto Incondicionado</span>
+              <div class="danfse-val">-</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Desconto Condicionado</span>
+              <div class="danfse-val">-</div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <span class="danfse-lbl">Total das Retenções (ISSQN / Federais)</span>
+              <div class="danfse-val">-</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">VALOR LÍQUIDO DA NFS-e</span>
+              <div class="danfse-val danfse-val-bold">${this.formatCurrency(data.vLiq, false)}</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">Total do IBS/CBS</span>
+              <div class="danfse-val">R$ 0,00</div>
+            </td>
+            <td>
+              <span class="danfse-lbl">VALOR LÍQUIDO DA NFS-e + IBS/CBS</span>
+              <div class="danfse-val">R$ 0,00</div>
+            </td>
+          </tr>
+
+          <!-- 11. INFORMAÇÕES COMPLEMENTARES -->
+          <tr>
+            <td colspan="4" class="danfse-bg-gray" style="padding: 2px 4px;">
+              <span class="danfse-lbl">INFORMAÇÕES COMPLEMENTARES</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="4" class="danfse-info-box">
+              <div style="font-size: 6.2pt; color: #222; line-height: 1.25;">
+                ${data.infoComp}
               </div>
-              <div>
-                <span class="text-slate-500 block text-[10px]">Protocolo de Autorização:</span>
-                <span class="font-mono font-semibold">${nfse.protocolo || '-'}</span>
+            </td>
+          </tr>
+
+          <!-- 12. CANHOTO DE RECEBIMENTO -->
+          <tr>
+            <td style="height: 38px; vertical-align: top;">
+              <span class="danfse-lbl">DATA CIENTIFICAÇÃO:</span>
+            </td>
+            <td colspan="2" style="height: 38px; vertical-align: top;">
+              <span class="danfse-lbl">IDENTIFICAÇÃO E ASSINATURA</span>
+            </td>
+            <td style="height: 38px; vertical-align: top;">
+              <span class="danfse-lbl">N° NFS-e / CHAVE NFS-e</span>
+              <div class="danfse-val danfse-val-bold" style="font-size: 6.5pt; font-family: monospace, Arial; margin-top: 2px; word-break: break-all;">
+                ${data.numNfse} / ${data.chave}
               </div>
-              <div>
-                <span class="text-slate-500 block text-[10px]">Série / Número DPS:</span>
-                <span class="font-semibold">Série ${nfse.serie || 1} • DPS nº ${nfse.numeroDps || '-'}</span>
-              </div>
-            </div>
-          </div>
-          <div class="col-span-1 flex flex-col items-center justify-center border-l border-slate-200 pl-2">
-            <img src="${qrCodeUrl}" alt="QR Code Autenticidade" class="w-20 h-20 border border-slate-200 p-0.5 bg-white" />
-            <span class="text-[9px] text-slate-500 mt-1 text-center font-medium">Consulte no portal oficial</span>
-          </div>
-        </div>
-      </div>
+            </td>
+          </tr>
 
-      <!-- Prestador dos Serviços (Empresa Representada) -->
-      <div class="border border-slate-800">
-        <div class="bg-slate-100 px-3 py-1 font-bold text-[11px] uppercase border-b border-slate-300 flex items-center justify-between">
-          <span>Dados do Prestador dos Serviços (Empresa Representada)</span>
-          ${nfse.procurador && nfse.procurador.viaProcuracao ? '<span class="text-[10px] font-semibold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">Emitido por Procurador via Representação RFB</span>' : ''}
-        </div>
-        <div class="p-3 grid grid-cols-3 gap-2">
-          <div class="col-span-2">
-            <span class="text-[10px] text-slate-500 block">Razão Social / Nome:</span>
-            <span class="font-bold text-slate-900 text-xs">${nfse.prestador.razaoSocial}</span>
-          </div>
-          <div>
-            <span class="text-[10px] text-slate-500 block">CNPJ do Prestador:</span>
-            <span class="font-bold font-mono text-slate-900 text-xs">${nfse.prestador.cnpj}</span>
-          </div>
-          <div>
-            <span class="text-[10px] text-slate-500 block">Inscrição Municipal (IM):</span>
-            <span class="font-semibold">${nfse.prestador.im || 'Isento / Não Informado'}</span>
-          </div>
-          <div class="col-span-2">
-            <span class="text-[10px] text-slate-500 block">Regime de Tributação:</span>
-            <span class="font-semibold">${nfse.prestador.regime}</span>
-          </div>
-          ${nfse.procurador && nfse.procurador.viaProcuracao ? `
-          <div class="col-span-3 pt-1 border-t border-slate-200 text-[10px] text-slate-600">
-            <span class="font-semibold">Procurador Certificado:</span> ${nfse.procurador.nome} (${nfse.procurador.doc})
-          </div>
-          ` : ''}
-        </div>
-      </div>
-
-      <!-- Tomador dos Serviços -->
-      <div class="border border-slate-800">
-        <div class="bg-slate-100 px-3 py-1 font-bold text-[11px] uppercase border-b border-slate-300">
-          Dados do Tomador dos Serviços (Cliente)
-        </div>
-        <div class="p-3 grid grid-cols-3 gap-2">
-          <div class="col-span-2">
-            <span class="text-[10px] text-slate-500 block">Razão Social / Nome do Tomador:</span>
-            <span class="font-bold text-slate-900 text-xs">${nfse.tomador.nome}</span>
-          </div>
-          <div>
-            <span class="text-[10px] text-slate-500 block">CPF / CNPJ:</span>
-            <span class="font-bold font-mono text-slate-900 text-xs">${nfse.tomador.doc}</span>
-          </div>
-          <div class="col-span-2">
-            <span class="text-[10px] text-slate-500 block">Endereço / Município:</span>
-            <span class="font-medium">${nfse.tomador.logradouro || ''} ${nfse.tomador.numero || ''} • ${nfse.tomador.municipio} - ${nfse.tomador.uf}</span>
-          </div>
-          <div>
-            <span class="text-[10px] text-slate-500 block">E-mail:</span>
-            <span class="font-medium truncate block">${nfse.tomador.email || '-'}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Discriminação dos Serviços -->
-      <div class="border border-slate-800">
-        <div class="bg-slate-100 px-3 py-1 font-bold text-[11px] uppercase border-b border-slate-300 flex justify-between">
-          <span>Discriminação dos Serviços Prestados</span>
-          <span class="font-mono text-[10px] text-slate-600">cTribNac: ${nfse.servico.cTribNac}</span>
-        </div>
-        <div class="p-3 min-h-[70px] whitespace-pre-wrap text-slate-800 font-sans text-xs leading-relaxed">
-${nfse.servico.descricao}
-        </div>
-      </div>
-
-      <!-- Quadro de Valores e Tributação -->
-      <div class="border border-slate-800">
-        <div class="bg-slate-100 px-3 py-1 font-bold text-[11px] uppercase border-b border-slate-300">
-          Valores do Serviço e Apuração de Tributos
-        </div>
-        <div class="p-3 space-y-3">
-          <!-- Linha Principal -->
-          <div class="grid grid-cols-4 gap-2 bg-slate-50 p-2.5 border border-slate-200 text-center">
-            <div>
-              <span class="text-[10px] text-slate-500 block">VALOR DOS SERVIÇOS</span>
-              <span class="font-extrabold text-sm text-slate-900">${this.formatCurrency(nfse.valores.vServ)}</span>
-            </div>
-            <div>
-              <span class="text-[10px] text-slate-500 block">ALÍQUOTA ISS</span>
-              <span class="font-bold text-sm text-slate-800">${(nfse.valores.pAliq || 0).toFixed(2)}%</span>
-            </div>
-            <div>
-              <span class="text-[10px] text-slate-500 block">VALOR DO ISS</span>
-              <span class="font-bold text-sm text-slate-800">${this.formatCurrency(nfse.valores.vIss)}</span>
-            </div>
-            <div>
-              <span class="text-[10px] text-slate-500 block">ISS RETIDO?</span>
-              <span class="font-bold text-sm ${nfse.valores.issRetido ? 'text-amber-700' : 'text-slate-800'}">
-                ${nfse.valores.issRetido ? 'SIM (Retido)' : 'NÃO'}
-              </span>
-            </div>
-          </div>
-
-          <!-- Tributos Federais Retidos -->
-          <div class="grid grid-cols-5 gap-2 text-center text-[11px] pt-1 border-t border-slate-200">
-            <div>
-              <span class="text-[10px] text-slate-500 block">PIS Retido</span>
-              <span class="font-semibold">${this.formatCurrency(nfse.valores.vPis)}</span>
-            </div>
-            <div>
-              <span class="text-[10px] text-slate-500 block">COFINS Retido</span>
-              <span class="font-semibold">${this.formatCurrency(nfse.valores.vCofins)}</span>
-            </div>
-            <div>
-              <span class="text-[10px] text-slate-500 block">INSS Retido</span>
-              <span class="font-semibold">${this.formatCurrency(nfse.valores.vInss)}</span>
-            </div>
-            <div>
-              <span class="text-[10px] text-slate-500 block">IRRF Retido</span>
-              <span class="font-semibold">${this.formatCurrency(nfse.valores.vIr)}</span>
-            </div>
-            <div>
-              <span class="text-[10px] text-slate-500 block">CSLL Retida</span>
-              <span class="font-semibold">${this.formatCurrency(nfse.valores.vCsll)}</span>
-            </div>
-          </div>
-
-          <!-- Totalizador Líquido -->
-          <div class="flex items-center justify-between p-2.5 bg-emerald-50 border border-emerald-300 rounded font-bold text-emerald-950">
-            <span>VALOR LÍQUIDO A RECEBER:</span>
-            <span class="text-base text-emerald-900">${this.formatCurrency(nfse.valores.vLiquido)}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Rodapé do Documento -->
-      <div class="text-[9px] text-slate-500 pt-1 flex justify-between items-center border-t border-slate-200">
-        <span>Emissor Nacional NFS-e • Conexão Direta RFB/ADN • CGNFS-e</span>
-        <span>Autenticidade garantida por assinatura digital ICP-Brasil</span>
+        </table>
       </div>
     `;
   }
 }
 
 window.danfseViewer = new DanfseViewer();
-

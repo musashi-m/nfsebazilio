@@ -61,23 +61,238 @@ body {
   }
 }
 
+/* Estilos Oficiais do DANFSE Nacional v2.0 */
+.danfse-page-container {
+  width: 100%;
+  max-width: 210mm;
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  padding: 3mm 4mm;
+  box-sizing: border-box;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Força modo claro no DANFSe mesmo com dark mode ativo no sistema */
+html.dark .danfse-page-container,
+html.dark .danfse-document,
+html.dark .danfse-document * {
+  background-color: transparent !important;
+  color: #000000 !important;
+}
+
+html.dark .danfse-page-container {
+  background-color: #ffffff !important;
+}
+
+html.dark .danfse-bg-gray,
+html.dark .danfse-sec-title,
+html.dark .danfse-bar-neutral {
+  background-color: #f2f2f2 !important;
+}
+
+.danfse-document {
+  width: 100%;
+  background: #ffffff !important;
+  color: #000000 !important;
+  box-sizing: border-box;
+}
+
+.danfse-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  background-color: #ffffff !important;
+}
+
+.danfse-table td,
+.danfse-table th {
+  border: 1px solid #000000 !important;
+  padding: 1.5px 3.5px;
+  vertical-align: top;
+  word-break: break-word;
+  font-size: 7.5pt;
+  line-height: 1.15;
+  background-color: #ffffff;
+}
+
+.danfse-bg-gray {
+  background-color: #f2f2f2 !important;
+}
+
+.danfse-title-main {
+  font-size: 13pt;
+  font-weight: bold;
+  line-height: 1.1;
+  color: #000000 !important;
+}
+
+.danfse-title-sub {
+  font-size: 9.5pt;
+  line-height: 1.1;
+  color: #000000 !important;
+}
+
+.danfse-chave-num {
+  font-size: 9.2pt;
+  font-weight: bold;
+  font-family: monospace, Arial, sans-serif;
+  letter-spacing: 0.5px;
+  color: #000000 !important;
+}
+
+.danfse-lbl {
+  display: block;
+  font-size: 6.5pt;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: #111111 !important;
+  line-height: 1.1;
+  margin-bottom: 0.5px;
+}
+
+.danfse-val {
+  display: block;
+  font-size: 7.5pt;
+  color: #000000 !important;
+  line-height: 1.15;
+}
+
+.danfse-val-bold {
+  font-weight: bold !important;
+}
+
+.danfse-sec-title {
+  font-size: 6.5pt;
+  font-weight: bold;
+  text-transform: uppercase;
+  background-color: #f2f2f2 !important;
+  color: #000000 !important;
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.danfse-bar-neutral {
+  text-align: center;
+  font-weight: bold;
+  font-size: 6pt;
+  background-color: #f2f2f2 !important;
+  color: #000000 !important;
+  padding: 2.5px 2px;
+  text-transform: uppercase;
+}
+
+.danfse-qr-text {
+  font-size: 5pt;
+  line-height: 1.05;
+  color: #222222 !important;
+  margin-top: 1px;
+}
+
+.danfse-desc-ctn {
+  font-size: 6.2pt;
+  color: #222222 !important;
+  line-height: 1.15;
+}
+
+.danfse-desc-serv {
+  white-space: pre-wrap;
+  font-size: 7pt;
+  line-height: 1.25;
+  padding-top: 1px;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #000000 !important;
+}
+
+.danfse-info-box {
+  min-height: 140px;
+  height: 140px;
+  vertical-align: top !important;
+  padding: 4px;
+}
+
+.danfse-watermark {
+  position: absolute;
+  top: 35%;
+  left: 10%;
+  right: 10%;
+  transform: rotate(-25deg);
+  font-size: 62pt;
+  font-weight: 900;
+  color: rgba(225, 29, 72, 0.28) !important;
+  border: 8px solid rgba(225, 29, 72, 0.28) !important;
+  text-align: center;
+  padding: 10px 0;
+  text-transform: uppercase;
+  pointer-events: none;
+  z-index: 20;
+}
+
 /* Estilos de Impressão do DANFSE Nacional */
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 4mm;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
   body * {
     visibility: hidden;
   }
-  #danfsePrintArea, #danfsePrintArea * {
+
+  #danfseModal,
+  #danfseModal * {
     visibility: visible;
   }
-  #danfsePrintArea {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    margin: 0;
-    padding: 0;
-    background: #fff !important;
+
+  #danfseModal {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    display: block !important;
   }
+
+  #danfseModal > div {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+  }
+
+  #danfsePrintArea {
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    width: 100% !important;
+  }
+
+  .danfse-page-container {
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .danfse-document {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
   .no-print {
     display: none !important;
   }
