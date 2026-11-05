@@ -11,6 +11,7 @@ package-lock.json
 *.cer
 data/active_cert.pfx
 data/active_cert_meta.json
+data/real_cert*
 data/*.pfx
 data/*.p12
 

@@ -9,5 +9,5 @@ echo Iniciando o servidor em http://localhost:3000 ...
 echo Pressione Ctrl+C para encerrar o sistema.
 echo.
 
-node server.js
+node --watch server.js
 pause

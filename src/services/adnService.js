@@ -161,14 +161,28 @@ class AdnService {
       } catch (directErr) {
         console.warn('Conexão direta RFB/SEFIN retornou status:', directErr.response ? directErr.response.status : directErr.message);
 
-        // Se a SEFIN/RFB retornou erros específicos de validação da DPS
-        if (directErr.response && directErr.response.data && directErr.response.data.erros) {
-          const errosList = directErr.response.data.erros;
-          const msgErros = errosList.map(e => `[${e.Codigo || e.codigo}] ${e.Descricao || e.descricao}${e.Complemento ? ` - ${e.Complemento}` : ''}`).join('; ');
-          throw translateError(new Error(msgErros), {
-            step: 'Validação da DPS na Receita Federal (SEFIN Nacional)',
-            rawCode: errosList[0]?.Codigo || 'SEFIN_REJEICAO'
-          });
+        // Se a SEFIN/RFB retornou resposta com dados de erro
+        if (directErr.response && directErr.response.data) {
+          const respData = directErr.response.data;
+          let rawErrorString = '';
+
+          if (respData.erros && Array.isArray(respData.erros)) {
+            rawErrorString = respData.erros.map(e => `[${e.Codigo || e.codigo || 'ERRO'}] ${e.Descricao || e.descricao || e.Mensagem || e.mensagem}${e.Complemento ? ` - ${e.Complemento}` : ''}`).join('; ');
+          } else if (respData.erro) {
+            const e = respData.erro;
+            rawErrorString = `[${e.codigo || e.Codigo || 'ERRO'}] ${e.descricao || e.mensagem || JSON.stringify(e)}`;
+          } else if (respData.mensagem || respData.message) {
+            rawErrorString = respData.mensagem || respData.message;
+          } else if (typeof respData === 'string' && respData.trim().length > 0) {
+            rawErrorString = respData.trim();
+          }
+
+          if (rawErrorString) {
+            throw translateError(new Error(rawErrorString), {
+              step: 'Validação da DPS na Receita Federal (SEFIN Nacional)',
+              rawCode: respData.erros?.[0]?.Codigo || respData.erro?.codigo || (directErr.response.status === 403 ? 'E2403' : 'SEFIN_REJEICAO')
+            });
+          }
         }
 
         // Somente tenta fallback para o SERPRO se o usuário de fato tiver chaves de API cadastradas

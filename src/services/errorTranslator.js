@@ -224,6 +224,18 @@ const ERROR_DICTIONARY = [
     severity: 'warning'
   },
   {
+    regex: /(403|forbidden|acesso negado|n[aã]o autorizado|permiss[aã]o negada)/i,
+    category: 'Autorização / Procuração RFB',
+    title: 'Acesso Não Autorizado pelo Servidor (HTTP 403)',
+    friendlyMessage: 'A Receita Federal (SEFIN Nacional) recusou o envio da DPS para esta empresa representada com o certificado digital atual.',
+    howToFix: [
+      'Verifique se a empresa representada outorgou Procuração Eletrônica ativa no e-CAC da Receita Federal para o CNPJ do certificado contábil.',
+      'Confirme se a procuração inclui o serviço específico "NFS-e - Nota Fiscal de Serviço Eletrônica" ou "Todos os serviços".',
+      'Caso a procuração seja recente, o sistema da Receita Federal pode levar até 2 horas para propagar a autorização nos servidores de emissão da SEFIN.'
+    ],
+    severity: 'error'
+  },
+  {
     regex: /(500|502|503|504|internal server error|bad gateway|service unavailable)/i,
     category: 'Servidores da RFB / SERPRO',
     title: 'Instabilidade Temporária no Portal Nacional',
