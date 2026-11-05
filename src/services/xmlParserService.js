@@ -156,14 +156,22 @@ class XmlParserService {
 
     // 5. Prestador / Emitente
     const emitBlock = this.getTag(xml, 'emit') || this.getTag(xml, 'prest') || '';
+    const prestBlock = this.getTag(xml, 'prest') || '';
     const emitCnpj = this.getTag(emitBlock, 'CNPJ') || this.getTag(xml, 'CNPJ') || '';
     const emitCpf = this.getTag(emitBlock, 'CPF') || '';
     const emitDocRaw = (emitCnpj || emitCpf).replace(/\D/g, '');
     const emitNome = this.getTag(emitBlock, 'xNome') || this.getTag(xml, 'xNome') || '';
     const emitFant = this.getTag(emitBlock, 'xFant') || '';
-    const emitIm = this.getTag(emitBlock, 'IM') || '';
+    const emitIm = this.getTag(emitBlock, 'IM') || this.getTag(prestBlock, 'IM') || '';
+    const emitEnderNac = this.getTag(emitBlock, 'enderNac') || this.getTag(this.getTag(prestBlock, 'end'), 'endNac') || '';
+    const emitEnd = this.getTag(prestBlock, 'end') || this.getTag(emitBlock, 'end') || '';
     const emitMun = this.getTag(xml, 'xLocEmi') || this.getTag(emitBlock, 'xMun') || '';
-    const emitUf = this.getTag(emitBlock, 'UF') || '';
+    const emitMunIbge = this.getTag(emitEnderNac, 'cMun') || this.getTag(xml, 'cLocEmi') || '';
+    const emitUf = this.getTag(emitEnderNac, 'UF') || this.getTag(emitBlock, 'UF') || '';
+    const emitCep = this.getTag(emitEnderNac, 'CEP') || this.getTag(emitEnd, 'CEP') || '';
+    const emitLgr = this.getTag(emitEnderNac, 'xLgr') || this.getTag(emitEnd, 'xLgr') || '';
+    const emitNro = this.getTag(emitEnderNac, 'nro') || this.getTag(emitEnd, 'nro') || '';
+    const emitBairro = this.getTag(emitEnderNac, 'xBairro') || this.getTag(emitEnd, 'xBairro') || '';
 
     // 6. Tomador
     const tomaBlock = this.getTag(xml, 'toma') || '';
@@ -226,7 +234,12 @@ class XmlParserService {
         nomeFantasia: emitFant,
         im: emitIm,
         municipio: emitMun,
-        uf: emitUf
+        municipioIbge: emitMunIbge,
+        uf: emitUf,
+        cep: emitCep,
+        logradouro: emitLgr,
+        numero: emitNro,
+        bairro: emitBairro
       },
       tomador: {
         doc: this.formatDoc(tomaDocRaw),

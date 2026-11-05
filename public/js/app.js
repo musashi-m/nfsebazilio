@@ -606,9 +606,16 @@ const App = {
       if (el && val !== undefined && val !== null) el.value = val;
     };
 
-    setVal('fPrestadorCnpj', comp.cnpj);
-    setVal('fPrestadorRazaoSocial', comp.razaoSocial);
-    setVal('fPrestadorIm', comp.im || '842161');
+    setVal('fPrestadorCnpj', comp.cnpj || '');
+    setVal('fPrestadorRazaoSocial', comp.razaoSocial || '');
+    setVal('fPrestadorIm', comp.im || '');
+    const cleanCep = (comp.cep || '').replace(/\D/g, '');
+    const formattedCep = cleanCep.length === 8 ? cleanCep.replace(/^(\d{5})(\d{3})$/, '$1-$2') : (comp.cep || '');
+    setVal('fPrestadorCep', formattedCep);
+    setVal('fPrestadorLogradouro', comp.logradouro || '');
+    setVal('fPrestadorNumero', comp.numero || '');
+    setVal('fPrestadorBairro', comp.bairro || '');
+
     const codIbge = comp.municipioIbge || '2800308';
     setVal('fMunicipioIbge', codIbge);
     setVal('fLocalPrestacaoIbge', codIbge);
@@ -3773,7 +3780,7 @@ const App = {
       tpEmit: document.querySelector('input[name="fTpEmit"]:checked')?.value || '1',
       prestadorCnpj: getVal('fPrestadorCnpj'),
       prestadorRazaoSocial: getVal('fPrestadorRazaoSocial'),
-      prestadorIm: getVal('fPrestadorIm') || '842161',
+      prestadorIm: getVal('fPrestadorIm') || '',
       municipioIbge: getVal('fMunicipioIbge') || '2800308',
       opSimpNac: parseInt(getVal('fOpSimpNac'), 10) || 3,
       regApTribSN: parseInt(getVal('fRegApTribSN'), 10) || 1,
