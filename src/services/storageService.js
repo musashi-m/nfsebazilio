@@ -19,6 +19,8 @@ const TEMPLATES_FILE = path.join(DATA_DIR, 'emission_templates.json');
 
 class StorageService {
   constructor() {
+    this._cachedHistory = null;
+    this._historyMtime = 0;
     this._ensureDir();
     this._initSeedData();
   }
@@ -94,9 +96,41 @@ class StorageService {
     }
   }
 
+  _getHistoryRaw() {
+    try {
+      if (!fs.existsSync(NFSE_FILE)) return [];
+      const stat = fs.statSync(NFSE_FILE);
+      if (this._cachedHistory && this._historyMtime === stat.mtimeMs) {
+        return this._cachedHistory;
+      }
+      const data = fs.readFileSync(NFSE_FILE, 'utf8');
+      this._cachedHistory = JSON.parse(data);
+      this._historyMtime = stat.mtimeMs;
+      return this._cachedHistory;
+    } catch (e) {
+      console.error(`Erro ao ler ${NFSE_FILE}:`, e);
+      return this._cachedHistory || [];
+    }
+  }
+
+  _writeHistory(data) {
+    try {
+      fs.writeFileSync(NFSE_FILE, JSON.stringify(data, null, 2), 'utf8');
+      this._cachedHistory = data;
+      try {
+        const stat = fs.statSync(NFSE_FILE);
+        this._historyMtime = stat.mtimeMs;
+      } catch (_) {}
+      return true;
+    } catch (e) {
+      console.error(`Erro ao salvar ${NFSE_FILE}:`, e);
+      return false;
+    }
+  }
+
   // --- HISTÓRICO ADN / NFS-E ---
   getHistory(filters = {}) {
-    let list = this._readJson(NFSE_FILE, []);
+    let list = this._getHistoryRaw();
 
     // Garante consistência de notas com registro de cancelamento
     list = list.map(item => {
@@ -160,7 +194,7 @@ class StorageService {
   }
 
   saveNfse(nfseRecord) {
-    const list = this._readJson(NFSE_FILE, []);
+    const list = this._getHistoryRaw();
     const cleanChave = (nfseRecord.chaveAcesso || '').replace(/\D/g, '');
     const index = list.findIndex(item => {
       const itemClean = (item.chaveAcesso || '').replace(/\D/g, '');
@@ -181,13 +215,13 @@ class StorageService {
     } else {
       list.unshift({ ...nfseRecord, createdAt: new Date().toISOString() });
     }
-    this._writeJson(NFSE_FILE, list);
+    this._writeHistory(list);
     return nfseRecord;
   }
 
   saveNfseBatch(records = []) {
     if (!records || records.length === 0) return 0;
-    const list = this._readJson(NFSE_FILE, []);
+    const list = this._getHistoryRaw();
     const map = new Map();
     for (const item of list) {
       if (item.chaveAcesso) {
@@ -219,7 +253,7 @@ class StorageService {
     }
 
     const merged = Array.from(map.values());
-    this._writeJson(NFSE_FILE, merged);
+    this._writeHistory(merged);
     return addedOrUpdated;
   }
 
@@ -237,7 +271,7 @@ class StorageService {
     const cleanDoc = (doc || '').replace(/\D/g, '');
     if (!cleanDoc) return null;
 
-    const list = this._readJson(NFSE_FILE, []);
+    const list = this._getHistoryRaw();
 
     // 1. Tenta encontrar notas emitidas especificamente por este prestador
     let matches = [];
@@ -349,7 +383,7 @@ class StorageService {
   getNfseByChave(chave) {
     if (!chave) return null;
     const cleanChave = chave.replace(/\D/g, '');
-    const list = this._readJson(NFSE_FILE, []);
+    const list = this._getHistoryRaw();
     return list.find(item => {
       const itemClean = (item.chaveAcesso || '').replace(/\D/g, '');
       return (itemClean && itemClean === cleanChave) || item.chaveAcesso === chave || item.id === chave;
@@ -359,7 +393,7 @@ class StorageService {
   updateNfseStatus(chave, status, motivoCancelamento = null) {
     if (!chave) return null;
     const cleanChave = chave.replace(/\D/g, '');
-    const list = this._readJson(NFSE_FILE, []);
+    const list = this._getHistoryRaw();
     const item = list.find(n => {
       const itemClean = (n.chaveAcesso || '').replace(/\D/g, '');
       return (itemClean && itemClean === cleanChave) || n.chaveAcesso === chave || n.id === chave;
@@ -370,7 +404,7 @@ class StorageService {
         item.motivoCancelamento = motivoCancelamento;
         item.dataCancelamento = item.dataCancelamento || new Date().toISOString();
       }
-      this._writeJson(NFSE_FILE, list);
+      this._writeHistory(list);
       return item;
     }
     return null;
