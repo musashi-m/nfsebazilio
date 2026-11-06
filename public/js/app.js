@@ -1956,6 +1956,16 @@ const App = {
     const payload = this.getEmissionPayload();
     const prestador = this.state.empresaAtiva || {};
 
+    let xTribNacTitle = '';
+    if (payload.cTribNac && this.state.auxData?.tributacaoNacional) {
+      const cleanCod = String(payload.cTribNac).replace(/\D/g, '').slice(0, 6);
+      const match = this.state.auxData.tributacaoNacional.find(t => 
+        (t.cTribNac && t.cTribNac.replace(/\D/g, '') === cleanCod) || 
+        (t.codigo && t.codigo.replace(/\D/g, '').slice(0, 6) === cleanCod)
+      );
+      if (match) xTribNacTitle = match.descricao;
+    }
+
     return {
       isRascunho: true,
       numeroNfse: 'PRÉVIA',
@@ -1978,8 +1988,11 @@ const App = {
       },
       tomador: {
         tipoDoc: payload.tomadorTipoDoc,
-        documento: payload.tomadorDoc || '00000000000',
-        razaoSocial: payload.tomadorNome || 'TOMADOR / ADQUIRENTE',
+        doc: payload.tomadorDoc || '',
+        docRaw: (payload.tomadorDoc || '').replace(/\D/g, ''),
+        documento: payload.tomadorDoc || '',
+        nome: payload.tomadorNome || '',
+        razaoSocial: payload.tomadorNome || '',
         im: payload.tomadorIm || '-',
         telefone: payload.tomadorTelefone || '',
         email: payload.tomadorEmail || '',
@@ -1993,7 +2006,9 @@ const App = {
       },
       servico: {
         cTribNac: payload.cTribNac || '171901',
-        xDescServ: payload.descricaoServico || 'PRESTAÇÃO DE SERVIÇOS',
+        xTribNac: xTribNacTitle || '',
+        descricao: payload.descricaoServico || '',
+        xDescServ: payload.descricaoServico || '',
         itemNbs: payload.itemNbs || '',
         localPrestacaoIbge: payload.localPrestacaoIbge || '2800308',
         paisPrestacao: payload.paisPrestacao || '1058'

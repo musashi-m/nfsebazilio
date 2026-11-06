@@ -418,8 +418,8 @@ class DanfseViewer {
       }
     }
 
-    if (!tomaDoc) tomaDoc = nfse.tomador?.doc || nfse.tomador?.docRaw || '-';
-    if (!tomaNome) tomaNome = nfse.tomador?.nome || '-';
+    if (!tomaDoc) tomaDoc = nfse.tomador?.doc || nfse.tomador?.docRaw || nfse.tomador?.documento || '-';
+    if (!tomaNome) tomaNome = nfse.tomador?.nome || nfse.tomador?.razaoSocial || '-';
     if (!tomaMunIbge) tomaMunIbge = nfse.tomador?.municipioIbge || '';
     if (!tomaCep) tomaCep = nfse.tomador?.cep || '';
     if (!tomaEnd) {
@@ -444,8 +444,18 @@ class DanfseViewer {
 
     // Serviço Prestado
     const cTribNac = getXml('cTribNac') || nfse.servico?.cTribNac || '';
-    const xTribNac = getXml('xTribNac') || 'Contabilidade, inclusive serviços técnicos e auxiliares.';
-    const xDescServ = getXml('xDescServ') || nfse.servico?.descricao || 'Honorários';
+    let xTribNac = getXml('xTribNac') || nfse.servico?.xTribNac || nfse.servico?.xTrib || '';
+    if (!xTribNac && cTribNac && window.App?.state?.auxData?.tributacaoNacional) {
+      const cleanCod = String(cTribNac).replace(/\D/g, '').slice(0, 6);
+      const match = window.App.state.auxData.tributacaoNacional.find(t => 
+        (t.cTribNac && t.cTribNac.replace(/\D/g, '') === cleanCod) || 
+        (t.codigo && t.codigo.replace(/\D/g, '').slice(0, 6) === cleanCod)
+      );
+      if (match) xTribNac = match.descricao;
+    }
+    if (!xTribNac) xTribNac = 'Prestação de Serviços';
+
+    const xDescServ = getXml('xDescServ') || nfse.servico?.xDescServ || nfse.servico?.descricao || '-';
     const xLocPrestacao = getXml('xLocPrestacao') || xLocEmi;
 
     // Tributação Municipal (ISSQN)
@@ -772,12 +782,14 @@ class DanfseViewer {
           </tr>
 
           <!-- 5. DESTINATÁRIO E INTERMEDIÁRIO -->
+          ${(!data.tomaDoc || data.tomaDoc === '-' || data.tomaDoc.trim() === '') ? `
           <tr>
             <td colspan="4" class="danfse-bar-neutral">DESTINATÁRIO DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e</td>
-          </tr>
+          </tr>` : ''}
+          ${(!data.intermDoc || data.intermDoc === '-' || data.intermDoc.trim() === '') ? `
           <tr>
             <td colspan="4" class="danfse-bar-neutral">INTERMEDIÁRIO DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e</td>
-          </tr>
+          </tr>` : ''}
 
           <!-- 6. SERVIÇO PRESTADO -->
           <tr class="danfse-sec-divider">
