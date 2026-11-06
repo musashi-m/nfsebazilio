@@ -526,30 +526,7 @@ const App = {
     }
 
     try {
-      const res = await safeFetchJson('/api/representation/representar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ doc })
-      });
-
-      if (!res.success) {
-        window.friendlyErrorModal.show(res.error);
-      } else {
-        this.state.activeRepresentation = res.representedCompany;
-        this.state.recentRepresentations = res.recentRepresentations;
-        this.updateRepresentationUI();
-        this.closeRepresentationModal();
-        await this.loadRepresentationClients();
-        await this.loadHistory();
-        await this.loadTemplates();
-      }
-    } catch (e) {
-      window.friendlyErrorModal.show({
-        title: 'Falha na Representação',
-        category: 'Procuração Eletrônica',
-        message: 'Não foi possível ativar a representação para este documento.',
-        technicalDetail: e.message
-      });
+      await this.submitRepresentarDoc(doc);
     } finally {
       if (btn) {
         btn.disabled = false;
@@ -573,14 +550,41 @@ const App = {
 
       if (!res.success) {
         window.friendlyErrorModal.show(res.error);
-      } else {
-        this.state.activeRepresentation = res.representedCompany;
-        this.state.recentRepresentations = res.recentRepresentations;
-        this.updateRepresentationUI();
-        this.closeRepresentationModal();
-        await this.loadHistory();
-        await this.loadTemplates();
+        return;
       }
+
+      // 1. ZERA TOTALMENTE A EMISSÃO ANTERIOR PARA EVITAR ERROS DE DADOS CRUZADOS
+      this.clearEmissionForm();
+      this.showEmissionChoiceView();
+
+      // Limpa inputs da tela de escolha de emissão
+      const prevNumInput = document.getElementById('loadPrevNumInput');
+      if (prevNumInput) prevNumInput.value = '';
+      const prevTomadorDoc = document.getElementById('loadPrevTomadorDoc');
+      if (prevTomadorDoc) prevTomadorDoc.value = '';
+
+      // 2. ZERA O HISTÓRICO DA EMPRESA ANTERIOR
+      this.state.history = [];
+
+      // 3. ATIVA A NOVA EMPRESA REPRESENTADA
+      this.state.activeRepresentation = res.representedCompany;
+      this.state.recentRepresentations = res.recentRepresentations;
+
+      // 4. PREENCHE O FORMULÁRIO COM AS INFORMAÇÕES EXCLUSIVAS DA NOVA REPRESENTADA
+      this.fillEmissionFormWithRepresentation(res.representedCompany);
+
+      // 5. VOLTA SEMPRE PARA A VISÃO GERAL (DASHBOARD)
+      this.switchTab('dashboard');
+
+      // 6. FECHA O MODAL E ATUALIZA A UI
+      this.closeRepresentationModal();
+      this.updateRepresentationUI();
+
+      // 7. CARREGA DADOS E HISTÓRICO EXCLUSIVOS DA NOVA REPRESENTADA
+      await this.loadRepresentationClients();
+      await this.loadHistory();
+      await this.loadTemplates();
+
     } catch (e) {
       window.friendlyErrorModal.show({
         title: 'Falha na Representação',
@@ -722,6 +726,13 @@ const App = {
     setRadio('fTomadorLocalizacao', 'brasil');
     setVal('fTomadorPais', '1058');
 
+    // Desmarca e oculta endereço manual do tomador
+    const chkEnd = document.getElementById('chkInformarEnderecoTomador');
+    if (chkEnd) {
+      chkEnd.checked = false;
+      this.toggleEnderecoTomador();
+    }
+
     // Serviço
     setVal('fDescricaoServico', '');
     setVal('fArtRrt', '');
@@ -729,14 +740,17 @@ const App = {
     setVal('fInformacoesComplementares', '');
     setVal('fCTribNac', '');
     setVal('fItemNbs', '');
+    setVal('fCodNbs', '');
     const descEl = document.getElementById('fDescricaoServico');
     if (descEl) this.handleDescricaoInput(descEl);
 
-    // Valores
+    // Valores e Deduções
     setVal('fValorServico', '');
     setVal('fValorIntermediario', '');
     setVal('fDescontoIncondicionado', '');
     setVal('fDescontoCondicionado', '');
+    setVal('fValorDeducao', '');
+    setVal('fDescricaoDeducao', '');
     setRadio('fRetencaoIssqnRadio', 'nao');
     this.handleRetencaoIssqnChange('nao');
     setVal('fAliquotaIss', '2.00');
@@ -744,6 +758,14 @@ const App = {
     setVal('fRetIr', '');
     setVal('fRetContrSociais', '');
     setVal('fRetInss', '');
+    setVal('fRetPis', '');
+    setVal('fRetCofins', '');
+    setVal('fRetCsll', '');
+    setVal('fRetIrrf', '');
+    setVal('fRetCp', '');
+
+    // Intermediário
+    this.limparIntermediario();
 
     // IBS/CBS
     setRadio('fIbsCbs', 'nao');
@@ -753,6 +775,12 @@ const App = {
     setVal('fDataCompetencia', hoje);
     const dispComp = document.getElementById('dispDataCompetencia');
     if (dispComp) dispComp.value = new Date().toLocaleDateString('pt-BR');
+
+    // Limpa campos de busca rápida de notas anteriores
+    const prevNum = document.getElementById('loadPrevNumInput');
+    if (prevNum) prevNum.value = '';
+    const prevDoc = document.getElementById('loadPrevTomadorDoc');
+    if (prevDoc) prevDoc.value = '';
 
     // Totais e etapas
     this.calculateEmissionTotals();
@@ -3245,6 +3273,9 @@ const App = {
               <button onclick="App.viewDanfse('${n.chaveAcesso}')" class="p-1 hover:bg-slate-100 text-slate-600 hover:text-brand-600 transition-colors" title="Visualizar DANFSE">
                 <i data-lucide="eye" class="w-4 h-4"></i>
               </button>
+              <button onclick="App.downloadDanfsePdf('${n.chaveAcesso}')" class="p-1 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 transition-colors" title="Baixar DANFSE (PDF)">
+                <i data-lucide="file-down" class="w-4 h-4"></i>
+              </button>
               <button onclick="App.downloadXml('${n.chaveAcesso}')" class="p-1 hover:bg-slate-100 text-slate-600 hover:text-brand-600 transition-colors" title="Baixar XML">
                 <i data-lucide="download" class="w-4 h-4"></i>
               </button>
@@ -3591,6 +3622,27 @@ const App = {
     const nfse = this.state.history.find(n => n.chaveAcesso === chaveAcesso);
     if (nfse) {
       window.danfseViewer.show(nfse);
+    }
+  },
+
+  async downloadDanfsePdf(chaveAcesso) {
+    if (!chaveAcesso) return;
+    const allNotes = this.state.history || [];
+    let nfse = allNotes.find(n => n.chaveAcesso === chaveAcesso || n.id === chaveAcesso);
+    if (!nfse) {
+      try {
+        const res = await safeFetchJson(`/api/adn/nfse/${chaveAcesso}`);
+        if (res && res.nfse) {
+          nfse = res.nfse;
+        }
+      } catch (e) {
+        console.warn('Erro ao obter dados da NFS-e para PDF:', e);
+      }
+    }
+    if (nfse) {
+      await window.danfseViewer.downloadPdf(nfse);
+    } else {
+      alert('NFS-e não encontrada para download do DANFSe.');
     }
   },
 

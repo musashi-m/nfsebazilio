@@ -41,9 +41,13 @@ class DanfseViewer {
                 <i data-lucide="file-code" class="w-3.5 h-3.5"></i>
                 <span>Baixar XML</span>
               </button>
-              <button onclick="window.danfseViewer.print()" class="px-4 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg flex items-center space-x-1.5 shadow-sm transition-colors">
-                <i data-lucide="printer" class="w-4 h-4"></i>
-                <span>Imprimir / Salvar PDF</span>
+              <button onclick="window.danfseViewer.downloadPdf()" id="btnDanfseDownloadPdf" class="px-4 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg flex items-center space-x-1.5 shadow-sm transition-colors">
+                <i data-lucide="file-down" class="w-4 h-4"></i>
+                <span id="btnDanfseDownloadPdfText">Baixar PDF</span>
+              </button>
+              <button onclick="window.danfseViewer.print()" class="px-3 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg flex items-center space-x-1.5 transition-colors border border-slate-700">
+                <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                <span>Imprimir</span>
               </button>
               <button onclick="window.danfseViewer.close()" class="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors ml-1">
                 <i data-lucide="x" class="w-5 h-5"></i>
@@ -82,6 +86,100 @@ class DanfseViewer {
 
   print() {
     window.print();
+  }
+
+  async downloadPdf(nfse = null) {
+    const targetNfse = nfse || this.currentNfse;
+    if (!targetNfse) {
+      alert('Nenhuma nota fiscal selecionada para download.');
+      return;
+    }
+
+    this.init();
+    if (!this.currentNfse || this.currentNfse.chaveAcesso !== targetNfse.chaveAcesso) {
+      this.currentNfse = targetNfse;
+      this.renderDanfse(targetNfse);
+    }
+
+    if (this.modalEl) {
+      this.modalEl.classList.remove('hidden');
+    }
+
+    const btn = document.getElementById('btnDanfseDownloadPdf');
+    const oldHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<span class="animate-spin inline-block text-xs mr-1">⌛</span><span>Gerando PDF...</span>`;
+    }
+
+    try {
+      const data = this.extractDanfseData(targetNfse);
+      const cleanNum = String(data.numNfse || targetNfse.numeroNfse || '').replace(/\D/g, '');
+      const cleanChave = String(data.chave || targetNfse.chaveAcesso || '').replace(/\D/g, '');
+      const filename = cleanNum ? `DANFSE_${cleanNum}.pdf` : `DANFSE_${cleanChave ? cleanChave.substring(0, 15) : 'NACIONAL'}.pdf`;
+
+      const targetEl = document.getElementById('danfseRenderTarget');
+      if (!targetEl) throw new Error('Elemento de visualização não encontrado.');
+
+      const docEl = targetEl.querySelector('.danfse-document') || targetEl;
+
+      // Espera imagens terminarem de carregar
+      const images = docEl.querySelectorAll('img');
+      await Promise.all(Array.from(images).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(res => {
+          img.onload = res;
+          img.onerror = res;
+          setTimeout(res, 2000);
+        });
+      }));
+
+      // Preserva estilos originais antes de fixar 200mm para proporção exata A4
+      const origWidth = docEl.style.width;
+      const origMaxWidth = docEl.style.maxWidth;
+      docEl.style.width = '200mm';
+      docEl.style.maxWidth = '200mm';
+
+      const opt = {
+        margin: [4, 5, 4, 5], // 4mm sup/inf, 5mm esq/dir (margens oficiais A4)
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: {
+          scale: 2.5, // 250 DPI - altíssima nitidez de texto e linhas
+          useCORS: true,
+          letterRendering: true,
+          backgroundColor: '#ffffff',
+          scrollY: 0,
+          scrollX: 0
+        },
+        jsPDF: {
+          unit: 'mm',
+          format: 'a4',
+          orientation: 'portrait'
+        },
+        pagebreak: { mode: 'avoid-all' }
+      };
+
+      if (typeof html2pdf !== 'undefined') {
+        await html2pdf().set(opt).from(docEl).save();
+      } else {
+        window.print();
+      }
+
+      // Restaura estilos originais
+      docEl.style.width = origWidth;
+      docEl.style.maxWidth = origMaxWidth;
+
+    } catch (err) {
+      console.error('Erro ao gerar download do PDF:', err);
+      window.print();
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = oldHtml;
+        if (window.lucide) lucide.createIcons();
+      }
+    }
   }
 
   copyChave() {
@@ -452,7 +550,7 @@ class DanfseViewer {
           <!-- 1. CABEÇALHO OFICIAL (TOPO) -->
           <tr>
             <td class="danfse-border-right" style="text-align: center; vertical-align: middle; padding: 2px;">
-              <img src="/img/nfse_logo_oficial.png" alt="NFS-e Nacional" style="max-height: 32px; max-width: 95%; display: block; margin: auto;">
+              <img src="/img/nfse_logo_oficial.png" crossorigin="anonymous" alt="NFS-e Nacional" style="max-height: 32px; max-width: 95%; display: block; margin: auto;">
             </td>
             <td colspan="2" class="danfse-border-right" style="text-align: center; vertical-align: middle; padding: 2px;">
               <div class="danfse-title-main">DANFSe v2.0</div>
@@ -527,7 +625,7 @@ class DanfseViewer {
               </table>
             </td>
             <td class="danfse-border-left" style="text-align: center; vertical-align: middle; padding: 2px;">
-              <img src="${qrCodeUrl}" alt="QR Code" style="width: 68px; height: 68px; display: block; margin: auto;">
+              <img src="${qrCodeUrl}" crossorigin="anonymous" alt="QR Code" style="width: 68px; height: 68px; display: block; margin: auto;">
               <div class="danfse-qr-text">A autenticidade desta NFS-e pode ser verificada pela leitura deste código QR ou pela consulta da chave de acesso no portal nacional da NFS-e</div>
             </td>
           </tr>
