@@ -481,34 +481,40 @@ class RepresentationService {
 
     const map = new Map();
 
-    // 1. Prestadores que já emitiram notas no histórico do ADN
-    const history = storageService.getHistory();
-    for (const n of history) {
-      if (n.prestador && n.prestador.cnpjRaw) {
-        const raw = n.prestador.cnpjRaw;
-        if (!map.has(raw)) {
-          const p = n.prestador;
-          map.set(raw, {
-            cnpj: p.cnpj,
-            cnpjRaw: raw,
-            razaoSocial: p.razaoSocial,
-            nomeFantasia: p.nomeFantasia || '',
-            im: p.im || '',
-            municipioNome: p.municipio || '',
-            uf: p.uf || '',
-            municipioIbge: '',
-            cep: '',
-            logradouro: '',
-            numero: '',
-            bairro: '',
-            regimeTributario: 1,
-            opSimpNac: 3
-          });
-        }
-        const c = map.get(raw);
-        if (!c.im && n.prestador.im) c.im = n.prestador.im;
+    // 1. Empresas salvas no catálogo de empresas cadastradas pelo usuário
+    const companies = storageService.getCompanies();
+    for (const c of companies) {
+      if (c.cnpjRaw && c.cnpjRaw !== '12345678000195') {
+        map.set(c.cnpjRaw, {
+          ...c,
+          razaoSocial: c.razaoSocial || `Empresa ${c.cnpjRaw}`
+        });
+      }
+    }
 
-        const xml = n.xmlCompleto || n.xmlAssinado;
+    // 2. Representações recentes confirmadas e utilizadas pelo usuário
+    const recents = this._readRecent();
+    for (const r of recents) {
+      if (r.cnpjRaw && r.cnpjRaw !== '12345678000195') {
+        const existing = map.get(r.cnpjRaw);
+        map.set(r.cnpjRaw, {
+          ...(existing || {}),
+          ...r,
+          razaoSocial: (r.razaoSocial && !r.razaoSocial.startsWith('EMPRESA CNPJ'))
+            ? r.razaoSocial
+            : ((existing && existing.razaoSocial) || r.razaoSocial)
+        });
+      }
+    }
+
+    // 3. Enriquece os dados cadastrais APENAS das empresas legítimas representadas (endereço, IM, Simples Nacional)
+    // NUNCA adiciona fornecedores externos de notas tomadas (Facebook, Cora, Acessórias, etc.) como clientes representados
+    const history = storageService.getHistory();
+    for (const [cnpjRaw, client] of map.entries()) {
+      const note = history.find(n => n.prestador && n.prestador.cnpjRaw === cnpjRaw);
+      if (note) {
+        if (!client.im && note.prestador.im) client.im = note.prestador.im;
+        const xml = note.xmlCompleto || note.xmlAssinado;
         if (xml) {
           const emit = xmlParserService.getTag(xml, 'emit');
           const prest = xmlParserService.getTag(xml, 'prest');
@@ -526,47 +532,16 @@ class RepresentationService {
           const regTrib = xmlParserService.getTag(prest, 'regTrib');
           const opSimpNac = xmlParserService.getTag(regTrib, 'opSimpNac');
 
-          if (cMun && !c.municipioIbge) c.municipioIbge = cMun;
-          if (cep && !c.cep) c.cep = cep;
-          if (lgr && !c.logradouro) c.logradouro = lgr;
-          if (nro && !c.numero) c.numero = nro;
-          if (cpl && !c.complemento) c.complemento = cpl;
-          if (bairro && !c.bairro) c.bairro = bairro;
-          if (uf && !c.uf) c.uf = uf;
-          if (im && !c.im) c.im = im;
-          if (opSimpNac && !c.opSimpNac) c.opSimpNac = Number(opSimpNac);
+          if (cMun && !client.municipioIbge) client.municipioIbge = cMun;
+          if (cep && !client.cep) client.cep = cep;
+          if (lgr && !client.logradouro) client.logradouro = lgr;
+          if (nro && !client.numero) client.numero = nro;
+          if (cpl && !client.complemento) client.complemento = cpl;
+          if (bairro && !client.bairro) client.bairro = bairro;
+          if (uf && !client.uf) client.uf = uf;
+          if (im && !client.im) client.im = im;
+          if (opSimpNac && !client.opSimpNac) client.opSimpNac = Number(opSimpNac);
         }
-      }
-    }
-
-    // 2. Empresas salvas no catálogo de empresas
-    const companies = storageService.getCompanies();
-    for (const c of companies) {
-      if (c.cnpjRaw) {
-        const existing = map.get(c.cnpjRaw);
-        map.set(c.cnpjRaw, {
-          ...(existing || {}),
-          ...c,
-          // Não sobrescreve razão social válida com placeholder
-          razaoSocial: (c.razaoSocial && !c.razaoSocial.startsWith('EMPRESA CNPJ'))
-            ? c.razaoSocial
-            : ((existing && existing.razaoSocial) || c.razaoSocial)
-        });
-      }
-    }
-
-    // 3. Representações recentes confirmadas
-    const recents = this._readRecent();
-    for (const r of recents) {
-      if (r.cnpjRaw) {
-        const existing = map.get(r.cnpjRaw);
-        map.set(r.cnpjRaw, {
-          ...(existing || {}),
-          ...r,
-          razaoSocial: (r.razaoSocial && !r.razaoSocial.startsWith('EMPRESA CNPJ'))
-            ? r.razaoSocial
-            : ((existing && existing.razaoSocial) || r.razaoSocial)
-        });
       }
     }
 
