@@ -781,7 +781,7 @@ const App = {
       this.openRepresentationModal();
       return null;
     }
-    const cleanRepCnpj = active.cnpjRaw;
+    const cleanRepCnpj = String(active.cnpjRaw || active.cnpj || '').replace(/\D/g, '');
 
     // Se o histórico estiver vazio, busca do backend
     if (!this.state.history || this.state.history.length === 0) {
@@ -790,10 +790,27 @@ const App = {
 
     const allNotes = this.state.history || [];
     // Filtra estritamente notas onde a empresa representada é a PRESTADORA (emitente)
-    const emitidas = allNotes.filter(n => {
-      const prestCnpj = (n.prestador && (n.prestador.cnpjRaw || (n.prestador.cnpj && n.prestador.cnpj.replace(/\D/g, '')))) || '';
-      return prestCnpj.includes(cleanRepCnpj);
+    let emitidas = allNotes.filter(n => {
+      const prestCnpj = String((n.prestador && (n.prestador.cnpjRaw || n.prestador.cnpj)) || '').replace(/\D/g, '');
+      const chaveCnpj = (n.chaveAcesso && n.chaveAcesso.length >= 23) ? n.chaveAcesso.substring(9, 23) : '';
+      return (prestCnpj && (prestCnpj.includes(cleanRepCnpj) || cleanRepCnpj.includes(prestCnpj))) || chaveCnpj === cleanRepCnpj;
     });
+
+    // Se não encontrou notas no cache local, tenta buscar diretamente do backend com ambiente=TODOS
+    if (emitidas.length === 0) {
+      try {
+        const res = await safeFetchJson(`/api/adn/history?prestadorCnpj=${cleanRepCnpj}&ambiente=TODOS`);
+        if (res && res.notas && res.notas.length > 0) {
+          emitidas = res.notas.filter(n => {
+            const prestCnpj = String((n.prestador && (n.prestador.cnpjRaw || n.prestador.cnpj)) || '').replace(/\D/g, '');
+            const chaveCnpj = (n.chaveAcesso && n.chaveAcesso.length >= 23) ? n.chaveAcesso.substring(9, 23) : '';
+            return (prestCnpj && (prestCnpj.includes(cleanRepCnpj) || cleanRepCnpj.includes(prestCnpj))) || chaveCnpj === cleanRepCnpj;
+          });
+        }
+      } catch (e) {
+        console.warn('Aviso ao buscar histórico do backend:', e);
+      }
+    }
 
     return { active, cleanRepCnpj, emitidas };
   },
@@ -801,178 +818,200 @@ const App = {
   preencherFormularioComNfse(nfse) {
     if (!nfse) return;
 
-    const setVal = (id, val) => {
-      const el = document.getElementById(id);
-      if (el && val !== undefined && val !== null) {
-        el.value = val;
-      }
-    };
+    try {
+      const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el && val !== undefined && val !== null) {
+          el.value = val;
+        }
+      };
 
-    const setRadio = (name, val) => {
-      const radio = document.querySelector(`input[name="${name}"][value="${val}"]`);
-      if (radio) radio.checked = true;
-    };
+      const setRadio = (name, val) => {
+        const radio = document.querySelector(`input[name="${name}"][value="${val}"]`);
+        if (radio) radio.checked = true;
+      };
 
-    // 1. Dados do Tomador
-    if (nfse.tomador) {
-      const t = nfse.tomador;
-      const rawDoc = t.doc || t.docRaw || '';
-      setVal('fTomadorDoc', rawDoc ? this.formatDocRaw(rawDoc) : '');
-      setVal('fTomadorNome', t.nome || t.razaoSocial || '');
-      setVal('fTomadorIm', t.im || '');
-      setVal('fTomadorEmail', t.email || '');
-      setVal('fTomadorTelefone', t.telefone || '');
+      // 1. Dados do Tomador
+      if (nfse.tomador) {
+        const t = nfse.tomador;
+        const rawDoc = t.doc || t.docRaw || '';
+        setVal('fTomadorDoc', rawDoc ? this.formatDocRaw(rawDoc) : '');
+        setVal('fTomadorNome', t.nome || t.razaoSocial || '');
+        setVal('fTomadorIm', t.im || '');
+        setVal('fTomadorEmail', t.email || '');
+        setVal('fTomadorTelefone', t.telefone || '');
 
-      // Endereço do Tomador
-      const end = t.endereco || t;
-      const temEndereco = Boolean(end.cep || end.logradouro || end.bairro || end.municipio || end.xMun);
-      const chkEnd = document.getElementById('chkInformarEnderecoTomador');
-      if (chkEnd) {
-        chkEnd.checked = temEndereco;
-        this.toggleEnderecoTomador();
-      }
+        // Endereço do Tomador
+        const end = t.endereco || t;
+        const temEndereco = Boolean(end.cep || end.logradouro || end.bairro || end.municipio || end.xMun);
+        const chkEnd = document.getElementById('chkInformarEnderecoTomador');
+        if (chkEnd) {
+          chkEnd.checked = temEndereco;
+          this.toggleEnderecoTomador();
+        }
 
-      if (temEndereco) {
-        setVal('fTomadorCep', end.cep || '');
-        setVal('fTomadorLogradouro', end.logradouro || end.xLgr || '');
-        setVal('fTomadorNumero', end.numero || end.nro || '');
-        setVal('fTomadorComplemento', end.complemento || end.xCpl || '');
-        setVal('fTomadorBairro', end.bairro || end.xBairro || '');
-        setVal('fTomadorMunicipio', end.municipio || end.xMun || '');
-        setVal('fTomadorUf', end.uf || 'SE');
-      }
-    }
-
-    // 2. Local do Fornecimento / Incidência
-    if (nfse.servico) {
-      const s = nfse.servico;
-      const cMun = s.cMunIncid || s.municipioIbge || '2800308';
-      setVal('fLocalPrestacaoIbge', cMun);
-      setVal('fMunicipioIncidencia', IBGE_MUNICIPIOS_MAP[cMun] || s.xLocIncid || 'Aracaju/SE');
-      this.atualizarDisplayMunicipio(cMun, 'local');
-      setVal('fPaisPrestacao', s.cPais || '1058');
-
-      // Código de Tributação Nacional (LC 116)
-      const cTrib = s.cTribNac || s.cTribMun;
-      if (cTrib) {
-        this.selectCTribNacByCode(cTrib);
+        if (temEndereco) {
+          setVal('fTomadorCep', end.cep || '');
+          setVal('fTomadorLogradouro', end.logradouro || end.xLgr || '');
+          setVal('fTomadorNumero', end.numero || end.nro || '');
+          setVal('fTomadorComplemento', end.complemento || end.xCpl || '');
+          setVal('fTomadorBairro', end.bairro || end.xBairro || '');
+          setVal('fTomadorMunicipio', end.municipio || end.xMun || '');
+          setVal('fTomadorUf', end.uf || 'SE');
+        }
       }
 
-      // NBS
-      if (s.itemNbs) {
-        this.selectItemNbsByCode(s.itemNbs);
+      // 2. Local do Fornecimento / Incidência
+      if (nfse.servico) {
+        const s = nfse.servico;
+        const cMun = s.cMunIncid || s.municipioIbge || '2800308';
+        setVal('fLocalPrestacaoIbge', cMun);
+        setVal('fMunicipioIncidencia', IBGE_MUNICIPIOS_MAP[cMun] || s.xLocIncid || 'Aracaju/SE');
+        this.atualizarDisplayMunicipio(cMun, 'local');
+        setVal('fPaisPrestacao', s.cPais || '1058');
+
+        // Código de Tributação Nacional (LC 116)
+        const cTrib = s.cTribNac || s.cTribMun;
+        if (cTrib) {
+          this.selectCTribNacByCode(cTrib);
+        }
+
+        // NBS
+        if (s.itemNbs) {
+          this.selectItemNbsByCode(s.itemNbs);
+        }
+
+        // Indicador da Operação
+        if (s.codigoIndicadorOperacao) {
+          setVal('fCodigoIndicadorOperacao', s.codigoIndicadorOperacao);
+        }
+
+        // Descrição do Serviço
+        const desc = s.descricao || s.xDescServ || '';
+        setVal('fDescricaoServico', desc);
+        const descEl = document.getElementById('fDescricaoServico');
+        if (descEl) this.handleDescricaoInput(descEl);
+
+        // Informações Complementares
+        setVal('fArtRrt', s.artRrt || '');
+        setVal('fDocReferencia', s.docReferencia || '');
+        setVal('fInformacoesComplementares', s.informacoesComplementares || nfse.infAdic || '');
       }
 
-      // Indicador da Operação
-      if (s.codigoIndicadorOperacao) {
-        setVal('fCodigoIndicadorOperacao', s.codigoIndicadorOperacao);
+      // 3. Valores e Retenções
+      if (nfse.valores) {
+        const v = nfse.valores;
+        const vServ = Number(v.valorServico ?? v.vServ ?? v.valorLiquido ?? v.vLiq ?? 0);
+        setVal('fValorServico', vServ > 0 ? vServ.toFixed(2) : '');
+
+        const vInterm = Number(v.valorIntermediario ?? 0);
+        setVal('fValorIntermediario', vInterm > 0 ? vInterm.toFixed(2) : '');
+
+        const vDescIncond = Number(v.descontoIncondicionado ?? v.vDescIncond ?? 0);
+        setVal('fDescontoIncondicionado', vDescIncond > 0 ? vDescIncond.toFixed(2) : '');
+
+        const vDescCond = Number(v.descontoCondicionado ?? v.vDescCond ?? 0);
+        setVal('fDescontoCondicionado', vDescCond > 0 ? vDescCond.toFixed(2) : '');
+
+        // Retenção ISSQN
+        const isRetido = this.isNotaRetida(nfse) || Boolean(v.iss?.retido || v.vISSRet > 0);
+        setRadio('fRetencaoIssqnRadio', isRetido ? 'sim' : 'nao');
+        this.handleRetencaoIssqnChange(isRetido ? 'sim' : 'nao');
+
+        if (isRetido) {
+          const aliq = Number(v.iss?.aliquota ?? v.pAliq ?? 2);
+          const aliqStr = aliq > 0 ? aliq.toFixed(2) : '2.00';
+          setVal('fAliquotaIss', aliqStr);
+          setVal('fAliquotaRetencao', aliqStr);
+        }
+        this.applyTomadorRetencaoRules();
+
+        // Retenções Federais
+        const retFed = v.retencoesFederais || {};
+        const ir = Number(retFed.ir ?? v.vIRRF ?? 0);
+        const csll = Number(retFed.csll ?? v.vCSLL ?? 0);
+        const inss = Number(retFed.inss ?? v.vINSS ?? 0);
+        if (ir > 0) setVal('fRetIr', ir.toFixed(2));
+        if (csll > 0) setVal('fRetContrSociais', csll.toFixed(2));
+        if (inss > 0) setVal('fRetInss', inss.toFixed(2));
       }
 
-      // Descrição do Serviço
-      const desc = s.descricao || s.xDescServ || '';
-      setVal('fDescricaoServico', desc);
-      const descEl = document.getElementById('fDescricaoServico');
-      if (descEl) this.handleDescricaoInput(descEl);
+      // 4. Competência atualizada para a data corrente
+      const hoje = new Date().toISOString().substring(0, 10);
+      setVal('fDataCompetencia', hoje);
+      const dispComp = document.getElementById('dispDataCompetencia');
+      if (dispComp) dispComp.value = new Date().toLocaleDateString('pt-BR');
 
-      // Informações Complementares
-      setVal('fArtRrt', s.artRrt || '');
-      setVal('fDocReferencia', s.docReferencia || '');
-      setVal('fInformacoesComplementares', s.informacoesComplementares || nfse.infAdic || '');
-    }
+      // 5. Recalcula totais
+      this.calculateEmissionTotals();
 
-    // 3. Valores e Retenções
-    if (nfse.valores) {
-      const v = nfse.valores;
-      const vServ = Number(v.valorServico ?? v.vServ ?? v.valorLiquido ?? v.vLiq ?? 0);
-      setVal('fValorServico', vServ > 0 ? vServ.toFixed(2) : '');
+      // 5.1 Transiciona da página de escolha para o formulário de emissão
+      const numNfse = nfse.numeroNfse || nfse.numeroDps || '';
+      const tomadorNome = nfse.tomador?.nome || nfse.tomador?.razaoSocial || nfse.tomador?.doc || 'Tomador';
+      this.showEmissionFormView({
+        mode: 'NOTA_ANTERIOR',
+        badgeText: `Baseada na NFS-e nº ${numNfse}`,
+        subtitle: `Dados carregados da nota anterior de ${tomadorNome}. Revise os valores antes de emitir.`
+      });
 
-      const vInterm = Number(v.valorIntermediario ?? 0);
-      setVal('fValorIntermediario', vInterm > 0 ? vInterm.toFixed(2) : '');
+      // 6. Alerta de sucesso
+      this.showLoadPreviousNoteAlert(`Dados da NFS-e nº ${numNfse} (${tomadorNome}) carregados com sucesso! Revise os valores antes de emitir.`);
 
-      const vDescIncond = Number(v.descontoIncondicionado ?? v.vDescIncond ?? 0);
-      setVal('fDescontoIncondicionado', vDescIncond > 0 ? vDescIncond.toFixed(2) : '');
-
-      const vDescCond = Number(v.descontoCondicionado ?? v.vDescCond ?? 0);
-      setVal('fDescontoCondicionado', vDescCond > 0 ? vDescCond.toFixed(2) : '');
-
-      // Retenção ISSQN
-      const isRetido = this.isNotaRetida(sourceNote) || Boolean(v.iss?.retido || v.vISSRet > 0);
-      setRadio('fRetencaoIssqnRadio', isRetido ? 'sim' : 'nao');
-      this.handleRetencaoIssqnChange(isRetido ? 'sim' : 'nao');
-
-      if (isRetido) {
-        const aliq = Number(v.iss?.aliquota ?? v.pAliq ?? 2);
-        const aliqStr = aliq > 0 ? aliq.toFixed(2) : '2.00';
-        setVal('fAliquotaIss', aliqStr);
-        setVal('fAliquotaRetencao', aliqStr);
+      // 7. Scroll suave para o primeiro campo do tomador
+      const tomadorDocEl = document.getElementById('fTomadorDoc');
+      if (tomadorDocEl) {
+        tomadorDocEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        tomadorDocEl.focus();
       }
-      this.applyTomadorRetencaoRules();
-
-      // Retenções Federais
-      const retFed = v.retencoesFederais || {};
-      const ir = Number(retFed.ir ?? v.vIRRF ?? 0);
-      const csll = Number(retFed.csll ?? v.vCSLL ?? 0);
-      const inss = Number(retFed.inss ?? v.vINSS ?? 0);
-      if (ir > 0) setVal('fRetIr', ir.toFixed(2));
-      if (csll > 0) setVal('fRetContrSociais', csll.toFixed(2));
-      if (inss > 0) setVal('fRetInss', inss.toFixed(2));
-    }
-
-    // 4. Competência atualizada para a data corrente
-    const hoje = new Date().toISOString().substring(0, 10);
-    setVal('fDataCompetencia', hoje);
-    const dispComp = document.getElementById('dispDataCompetencia');
-    if (dispComp) dispComp.value = new Date().toLocaleDateString('pt-BR');
-
-    // 5. Recalcula totais
-    this.calculateEmissionTotals();
-
-    // 5.1 Transiciona da página de escolha para o formulário de emissão
-    const numNfse = nfse.numeroNfse || nfse.numeroDps || '';
-    const tomadorNome = nfse.tomador?.nome || nfse.tomador?.razaoSocial || nfse.tomador?.doc || 'Tomador';
-    this.showEmissionFormView({
-      mode: 'NOTA_ANTERIOR',
-      badgeText: `Baseada na NFS-e nº ${numNfse}`,
-      subtitle: `Dados carregados da nota anterior de ${tomadorNome}. Revise os valores antes de emitir.`
-    });
-
-    // 6. Alerta de sucesso
-    this.showLoadPreviousNoteAlert(`Dados da NFS-e nº ${numNfse} (${tomadorNome}) carregados com sucesso! Revise os valores antes de emitir.`);
-
-    // 7. Scroll suave para o primeiro campo do tomador
-    const tomadorDocEl = document.getElementById('fTomadorDoc');
-    if (tomadorDocEl) {
-      tomadorDocEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      tomadorDocEl.focus();
+    } catch (e) {
+      console.error('Erro ao preencher formulário com NFS-e anterior:', e);
+      alert('Erro ao carregar dados da nota selecionada: ' + e.message);
     }
   },
 
   async carregarUltimaNfseEmitida() {
-    const data = await this.getNotesForActiveRepresentation();
-    if (!data) return;
-    const { active, emitidas } = data;
-
-    if (emitidas.length === 0) {
-      alert(`Nenhuma nota fiscal emitida anteriormente foi localizada no acervo de ${active.razaoSocial} (${active.cnpj}).`);
-      return;
+    const btn = document.getElementById('btnCarregarUltimaNfse');
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<span class="animate-spin inline-block text-xs mr-1">⌛</span> Localizando nota...`;
     }
 
-    // Ordena decrescente pela data mais recente ou maior número
-    const sorted = [...emitidas].sort((a, b) => {
-      const timeA = new Date(a.dataEmissao || a.dataAutorizacao || a.createdAt || 0).getTime();
-      const timeB = new Date(b.dataEmissao || b.dataAutorizacao || b.createdAt || 0).getTime();
-      if (timeB !== timeA) return timeB - timeA;
-      return (Number(b.numeroNfse) || 0) - (Number(a.numeroNfse) || 0);
-    });
+    try {
+      const data = await this.getNotesForActiveRepresentation();
+      if (!data) return;
+      const { active, emitidas } = data;
 
-    const lastNote = sorted[0];
-    this.preencherFormularioComNfse(lastNote);
+      if (emitidas.length === 0) {
+        alert(`Nenhuma nota fiscal emitida anteriormente foi localizada no acervo de ${active.razaoSocial} (${active.cnpj}).`);
+        return;
+      }
+
+      // Ordena decrescente pela data mais recente ou maior número
+      const sorted = [...emitidas].sort((a, b) => {
+        const timeA = new Date(a.dataEmissao || a.dataAutorizacao || a.createdAt || 0).getTime();
+        const timeB = new Date(b.dataEmissao || b.dataAutorizacao || b.createdAt || 0).getTime();
+        if (timeB !== timeA) return timeB - timeA;
+        return (Number(b.numeroNfse) || 0) - (Number(a.numeroNfse) || 0);
+      });
+
+      const lastNote = sorted[0];
+      this.preencherFormularioComNfse(lastNote);
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao carregar última nota emitida: ' + err.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+        if (window.lucide) lucide.createIcons();
+      }
+    }
   },
 
   async carregarNfsePorNumero() {
-    const data = await this.getNotesForActiveRepresentation();
-    if (!data) return;
-    const { active, emitidas } = data;
+    const btn = document.getElementById('btnCarregarPorNumero');
+    const origHtml = btn ? btn.innerHTML : '';
 
     const ano = (document.getElementById('loadPrevNfseAno')?.value || '').trim();
     const numInput = (document.getElementById('loadPrevNfseNumero')?.value || '').trim();
@@ -984,40 +1023,61 @@ const App = {
       return;
     }
 
-    const match = emitidas.find(n => {
-      const nNum = String(n.numeroNfse || '').replace(/\D/g, '');
-      const nChave = String(n.chaveAcesso || '').replace(/\D/g, '');
-      const nDps = String(n.numeroDps || '').replace(/\D/g, '');
-
-      if (ano) {
-        const dEmissao = n.dataEmissao || n.dataAutorizacao || n.createdAt || '';
-        const comp = String(n.competencia || '');
-        const noteAno = dEmissao ? new Date(dEmissao).getFullYear().toString() : (comp.slice(0, 4) || '');
-        if (noteAno && noteAno !== ano) {
-          return false;
-        }
-      }
-
-      return nNum === cleanNum ||
-             nNum.endsWith(cleanNum) ||
-             nChave === cleanNum ||
-             nChave.endsWith(cleanNum) ||
-             nDps === cleanNum;
-    });
-
-    if (!match) {
-      const anoMsg = ano ? ` no ano de ${ano}` : '';
-      alert(`Nenhuma NFS-e de número "${numInput}"${anoMsg} foi localizada no acervo de ${active.razaoSocial} (${active.cnpj}).`);
-      return;
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<span class="animate-spin inline-block text-xs mr-1">⌛</span> Buscando nota...`;
     }
 
-    this.preencherFormularioComNfse(match);
+    try {
+      const data = await this.getNotesForActiveRepresentation();
+      if (!data) return;
+      const { active, emitidas } = data;
+
+      const match = emitidas.find(n => {
+        const nNum = String(n.numeroNfse || '').replace(/\D/g, '');
+        const nChave = String(n.chaveAcesso || '').replace(/\D/g, '');
+        const nDps = String(n.numeroDps || '').replace(/\D/g, '');
+
+        if (ano) {
+          const dEmissao = n.dataEmissao || n.dataAutorizacao || n.createdAt || '';
+          const comp = String(n.competencia || '');
+          const noteAno = dEmissao ? new Date(dEmissao).getFullYear().toString() : (comp.slice(0, 4) || '');
+          if (noteAno && noteAno !== ano) {
+            return false;
+          }
+        }
+
+        return nNum === cleanNum ||
+               nNum.endsWith(cleanNum) ||
+               (cleanNum.length >= 10 && nChave.includes(cleanNum)) ||
+               nChave === cleanNum ||
+               nChave.endsWith(cleanNum) ||
+               nDps === cleanNum ||
+               (Number(cleanNum) > 0 && Number(nNum) === Number(cleanNum));
+      });
+
+      if (!match) {
+        const anoMsg = ano ? ` no ano de ${ano}` : '';
+        alert(`Nenhuma NFS-e de número "${numInput}"${anoMsg} foi localizada no acervo de ${active.razaoSocial} (${active.cnpj}).`);
+        return;
+      }
+
+      this.preencherFormularioComNfse(match);
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao buscar nota por número: ' + err.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+        if (window.lucide) lucide.createIcons();
+      }
+    }
   },
 
   async carregarNfsePorTomador() {
-    const data = await this.getNotesForActiveRepresentation();
-    if (!data) return;
-    const { active, emitidas } = data;
+    const btn = document.getElementById('btnCarregarPorTomador');
+    const origHtml = btn ? btn.innerHTML : '';
 
     const docInput = (document.getElementById('loadPrevTomadorDoc')?.value || '').trim();
     const cleanDoc = docInput.replace(/\D/g, '');
@@ -1028,26 +1088,60 @@ const App = {
       return;
     }
 
-    const matchNotes = emitidas.filter(n => {
-      const tDoc = (n.tomador && (n.tomador.docRaw || (n.tomador.doc && n.tomador.doc.replace(/\D/g, '')))) || '';
-      return tDoc.includes(cleanDoc) || cleanDoc.includes(tDoc);
-    });
-
-    if (matchNotes.length === 0) {
-      alert(`Nenhuma nota emitida anteriormente para o tomador "${docInput}" foi localizada no acervo de ${active.razaoSocial} (${active.cnpj}).`);
-      return;
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<span class="animate-spin inline-block text-xs mr-1">⌛</span> Buscando tomador...`;
     }
 
-    // Ordena pela nota mais recente emitida para este tomador
-    const sorted = [...matchNotes].sort((a, b) => {
-      const timeA = new Date(a.dataEmissao || a.dataAutorizacao || a.createdAt || 0).getTime();
-      const timeB = new Date(b.dataEmissao || b.dataAutorizacao || b.createdAt || 0).getTime();
-      if (timeB !== timeA) return timeB - timeA;
-      return (Number(b.numeroNfse) || 0) - (Number(a.numeroNfse) || 0);
-    });
+    try {
+      const data = await this.getNotesForActiveRepresentation();
+      if (!data) return;
+      const { active, emitidas } = data;
 
-    const mostRecent = sorted[0];
-    this.preencherFormularioComNfse(mostRecent);
+      const matchNotes = emitidas.filter(n => {
+        const tDoc = (n.tomador && (n.tomador.docRaw || (n.tomador.doc && n.tomador.doc.replace(/\D/g, '')))) || '';
+        return tDoc.includes(cleanDoc) || cleanDoc.includes(tDoc);
+      });
+
+      if (matchNotes.length === 0) {
+        alert(`Nenhuma nota emitida anteriormente para o tomador "${docInput}" foi localizada no acervo de ${active.razaoSocial} (${active.cnpj}).`);
+        return;
+      }
+
+      // Ordena pela nota mais recente emitida para este tomador
+      const sorted = [...matchNotes].sort((a, b) => {
+        const timeA = new Date(a.dataEmissao || a.dataAutorizacao || a.createdAt || 0).getTime();
+        const timeB = new Date(b.dataEmissao || b.dataAutorizacao || b.createdAt || 0).getTime();
+        if (timeB !== timeA) return timeB - timeA;
+        return (Number(b.numeroNfse) || 0) - (Number(a.numeroNfse) || 0);
+      });
+
+      const mostRecent = sorted[0];
+      this.preencherFormularioComNfse(mostRecent);
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao buscar nota por tomador: ' + err.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+        if (window.lucide) lucide.createIcons();
+      }
+    }
+  },
+
+  reemitirComBaseNestaNfse(chaveAcesso) {
+    if (!chaveAcesso) return;
+    const allNotes = this.state.history || [];
+    const note = allNotes.find(n => n.chaveAcesso === chaveAcesso || n.id === chaveAcesso);
+    if (!note) {
+      alert('Nota fiscal não localizada no histórico.');
+      return;
+    }
+    // Muda para a aba de emissão
+    this.switchTab('emissao');
+    // Preenche o formulário com a nota selecionada
+    this.preencherFormularioComNfse(note);
   },
 
   // --- MODELOS PRONTOS DE NOTA FISCAL (TEMPLATES) ---
@@ -3142,6 +3236,9 @@ const App = {
               <button onclick="App.promptCancelamento('${n.chaveAcesso}')" class="p-1 hover:bg-rose-50 text-slate-500 hover:text-rose-600 transition-colors" title="Cancelar Nota">
                 <i data-lucide="x-circle" class="w-4 h-4"></i>
               </button>` : ''}
+              <button onclick="App.reemitirComBaseNestaNfse('${n.chaveAcesso}')" class="p-1 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 transition-colors" title="Emitir Nova Nota com Base Nesta">
+                <i data-lucide="copy-plus" class="w-4 h-4"></i>
+              </button>
               <button onclick="App.consultarNfseOnline('${n.chaveAcesso}')" class="p-1 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 transition-colors" title="Consultar e Atualizar Status no ADN">
                 <i data-lucide="refresh-cw" class="w-4 h-4"></i>
               </button>

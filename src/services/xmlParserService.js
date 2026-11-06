@@ -95,7 +95,7 @@ class XmlParserService {
       if (matchAttr) return matchAttr[1];
       const match50 = xml.match(/\b([0-9]{50})\b/);
       if (match50) return match50[1];
-    } catch (_) {}
+    } catch (_) { }
     return '';
   }
 
