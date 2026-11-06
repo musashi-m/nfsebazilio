@@ -1859,11 +1859,292 @@ const App = {
       this.renderStep4DanfsePreview();
     }
 
+    this.updateEmissionBottomBar(step);
+
     if (window.lucide) lucide.createIcons();
     const panel = document.getElementById('panel-emissao');
     if (panel) {
       panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+  },
+
+  toggleConfigAvancadasNota() {
+    const box = document.getElementById('boxConfigAvancadasNota');
+    const icon = document.getElementById('iconConfigAvancadas');
+    if (!box) return;
+    const isHidden = box.classList.contains('hidden');
+    if (isHidden) {
+      box.classList.remove('hidden');
+      if (icon) icon.style.transform = 'rotate(180deg)';
+    } else {
+      box.classList.add('hidden');
+      if (icon) icon.style.transform = 'rotate(0deg)';
+    }
+  },
+
+  goToNextEmissionStep() {
+    const cur = this.state.currentEmissionStep || 1;
+    if (cur < 4) {
+      this.goToEmissionStep(cur + 1);
+    } else {
+      this.submitEmission();
+    }
+  },
+
+  goToPrevEmissionStep() {
+    const cur = this.state.currentEmissionStep || 1;
+    if (cur > 1) {
+      this.goToEmissionStep(cur - 1);
+    }
+  },
+
+  updateEmissionBottomBar(step) {
+    const bar = document.getElementById('emissionStickyBottomBar');
+    if (!bar) return;
+
+    const stepNames = {
+      1: { name: 'Pessoas', next: 'Próxima: Serviço' },
+      2: { name: 'Serviço', next: 'Próxima: Valores' },
+      3: { name: 'Valores', next: 'Próxima: Revisão' },
+      4: { name: 'Revisão', next: 'Emitir NFS-e Nacional Agora' }
+    };
+
+    const info = stepNames[step] || stepNames[1];
+
+    const badge = document.getElementById('bottomNavStepBadge');
+    if (badge) badge.innerText = `Etapa ${step} de 4`;
+
+    const nameEl = document.getElementById('bottomNavStepName');
+    if (nameEl) nameEl.innerText = info.name;
+
+    // Dots
+    for (let i = 1; i <= 4; i++) {
+      const dot = document.getElementById(`bottomDot-${i}`);
+      if (dot) {
+        if (i === step) dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-600 ring-2 ring-emerald-300 transition-all';
+        else if (i < step) dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500 transition-all';
+        else dot.className = 'w-2.5 h-2.5 rounded-full bg-slate-300 transition-all';
+      }
+    }
+
+    // Botão Voltar
+    const btnPrev = document.getElementById('bottomNavBtnPrev');
+    if (btnPrev) {
+      btnPrev.disabled = (step === 1);
+    }
+
+    // Botão Próximo
+    const btnNext = document.getElementById('bottomNavBtnNext');
+    const btnNextText = document.getElementById('bottomNavBtnNextText');
+    const btnNextIcon = document.getElementById('bottomNavBtnNextIcon');
+    if (btnNext && btnNextText) {
+      btnNextText.innerText = info.next;
+      if (step === 4) {
+        btnNext.className = 'px-5 sm:px-6 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center space-x-2 active:scale-95 animate-pulse';
+        if (btnNextIcon) btnNextIcon.setAttribute('data-lucide', 'send');
+      } else {
+        btnNext.className = 'px-5 sm:px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center space-x-2 active:scale-95';
+        if (btnNextIcon) btnNextIcon.setAttribute('data-lucide', 'arrow-right');
+      }
+    }
+
+    if (window.lucide) lucide.createIcons();
+  },
+
+  async openRecentTomadoresModal() {
+    const modal = document.getElementById('modalRecentTomadores');
+    if (!modal) return;
+
+    const listEl = document.getElementById('recentTomadoresList');
+    const subEl = document.getElementById('recentTomadoresSubtitle');
+    const countEl = document.getElementById('recentTomadoresCount');
+    const active = this.state.activeRepresentation || this.state.empresaAtiva;
+
+    if (subEl && active) {
+      subEl.innerText = `Clientes atendidos por ${active.razaoSocial || active.nome || 'sua empresa'}`;
+    }
+
+    modal.classList.remove('hidden');
+    if (listEl) {
+      listEl.innerHTML = `
+        <div class="py-8 text-center text-slate-400 text-xs">
+          <span class="animate-spin inline-block text-base mr-2">⌛</span>
+          Carregando clientes recentes...
+        </div>
+      `;
+    }
+
+    try {
+      const data = await this.getNotesForActiveRepresentation();
+      if (!data) {
+        if (listEl) listEl.innerHTML = `<div class="py-8 text-center text-slate-400 text-xs">Nenhuma empresa representada selecionada.</div>`;
+        return;
+      }
+
+      const { emitidas } = data;
+      const seen = new Set();
+      const tomadores = [];
+
+      for (const n of emitidas) {
+        if (!n.tomador) continue;
+        const docRaw = (n.tomador.docRaw || n.tomador.doc || n.tomador.documento || '').replace(/\D/g, '');
+        if (!docRaw || docRaw === '00000000000' || seen.has(docRaw)) continue;
+        seen.add(docRaw);
+
+        tomadores.push({
+          doc: docRaw,
+          docFormatted: this.formatDocRaw(docRaw),
+          nome: n.tomador.nome || n.tomador.razaoSocial || 'Cliente Sem Nome',
+          im: n.tomador.im || '',
+          telefone: n.tomador.telefone || '',
+          email: n.tomador.email || '',
+          cep: n.tomador.cep || (n.tomador.endereco && n.tomador.endereco.cep) || '',
+          logradouro: n.tomador.logradouro || (n.tomador.endereco && n.tomador.endereco.logradouro) || '',
+          numero: n.tomador.numero || (n.tomador.endereco && n.tomador.endereco.numero) || '',
+          complemento: n.tomador.complemento || (n.tomador.endereco && n.tomador.endereco.complemento) || '',
+          bairro: n.tomador.bairro || (n.tomador.endereco && n.tomador.endereco.bairro) || '',
+          municipio: n.tomador.municipio || (n.tomador.endereco && n.tomador.endereco.municipio) || '',
+          uf: n.tomador.uf || (n.tomador.endereco && n.tomador.endereco.uf) || 'SE',
+          municipioIbge: n.tomador.municipioIbge || '',
+          lastNoteDate: n.dataEmissao || n.dataAutorizacao || n.createdAt || '',
+          lastNoteNum: n.numeroNfse || n.numeroDps || ''
+        });
+      }
+
+      this.state.cachedRecentTomadores = tomadores;
+      this.renderRecentTomadoresList(tomadores);
+    } catch (err) {
+      console.error('Erro ao listar tomadores recentes:', err);
+      if (listEl) {
+        listEl.innerHTML = `<div class="py-8 text-center text-rose-500 text-xs">Erro ao carregar clientes: ${err.message}</div>`;
+      }
+    }
+
+    const input = document.getElementById('searchRecentTomadoresInput');
+    if (input) {
+      input.value = '';
+      setTimeout(() => input.focus(), 100);
+    }
+    if (window.lucide) lucide.createIcons();
+  },
+
+  closeRecentTomadoresModal() {
+    const modal = document.getElementById('modalRecentTomadores');
+    if (modal) modal.classList.add('hidden');
+  },
+
+  renderRecentTomadoresList(list) {
+    const listEl = document.getElementById('recentTomadoresList');
+    const countEl = document.getElementById('recentTomadoresCount');
+    if (!listEl) return;
+
+    if (countEl) {
+      countEl.innerText = `${list.length} cliente${list.length === 1 ? '' : 's'} encontrado${list.length === 1 ? '' : 's'}`;
+    }
+
+    if (list.length === 0) {
+      listEl.innerHTML = `
+        <div class="py-10 text-center text-slate-400 space-y-2">
+          <i data-lucide="user-x" class="w-8 h-8 mx-auto text-slate-300"></i>
+          <p class="text-xs">Nenhum tomador localizado no histórico recente desta empresa.</p>
+        </div>
+      `;
+      if (window.lucide) lucide.createIcons();
+      return;
+    }
+
+    listEl.innerHTML = list.map((t, idx) => {
+      const dataStr = t.lastNoteDate ? new Date(t.lastNoteDate).toLocaleDateString('pt-BR') : '';
+      const docBadgeClass = t.doc.length === 11 ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-purple-50 text-purple-700 border-purple-200';
+      const docTipo = t.doc.length === 11 ? 'CPF' : 'CNPJ';
+
+      return `
+        <div onclick="App.selecionarTomadorRecente(${idx})" class="p-3 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/40 transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 group">
+          <div class="min-w-0 space-y-1">
+            <div class="flex items-center space-x-2">
+              <span class="font-bold text-xs text-slate-800 group-hover:text-emerald-800 truncate">${t.nome}</span>
+              <span class="px-1.5 py-0.5 rounded border text-[10px] font-mono font-bold ${docBadgeClass}">${docTipo} ${t.docFormatted}</span>
+            </div>
+            <div class="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-1">
+              ${t.municipio ? `<span>📍 ${t.municipio}/${t.uf}</span>` : ''}
+              ${t.email ? `<span>✉️ ${t.email}</span>` : ''}
+              ${t.telefone ? `<span>📞 ${t.telefone}</span>` : ''}
+            </div>
+          </div>
+          <div class="shrink-0 flex items-center sm:flex-col sm:items-end justify-between sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+            ${t.lastNoteNum ? `<span class="text-[10px] text-slate-400 font-medium">Última NFS-e: #${t.lastNoteNum}</span>` : ''}
+            ${dataStr ? `<span class="text-[10px] text-slate-400">${dataStr}</span>` : ''}
+            <span class="mt-1 px-2.5 py-1 rounded-lg bg-white group-hover:bg-emerald-600 text-slate-600 group-hover:text-white border border-slate-200 group-hover:border-emerald-600 text-[10px] font-bold transition-all shadow-2xs">
+              Selecionar
+            </span>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    if (window.lucide) lucide.createIcons();
+  },
+
+  filterRecentTomadores(query) {
+    const all = this.state.cachedRecentTomadores || [];
+    const q = (query || '').toLowerCase().trim();
+    if (!q) {
+      this.renderRecentTomadoresList(all);
+      return;
+    }
+    const cleanNum = q.replace(/\D/g, '');
+    const filtered = all.filter(t => {
+      const matchNome = (t.nome || '').toLowerCase().includes(q);
+      const matchDoc = cleanNum && t.doc.includes(cleanNum);
+      const matchMun = (t.municipio || '').toLowerCase().includes(q);
+      return matchNome || matchDoc || matchMun;
+    });
+    this.renderRecentTomadoresList(filtered);
+  },
+
+  selecionarTomadorRecente(idx) {
+    const list = this.state.cachedRecentTomadores || [];
+    const t = list[idx];
+    if (!t) return;
+
+    const setVal = (id, val) => {
+      const el = document.getElementById(id);
+      if (el && val !== undefined && val !== null) el.value = val;
+    };
+
+    setVal('fTomadorDoc', t.docFormatted || t.doc);
+    setVal('fTomadorNome', t.nome || '');
+    setVal('fTomadorIm', t.im || '');
+    setVal('fTomadorEmail', t.email || '');
+    setVal('fTomadorTelefone', t.telefone || '');
+
+    const temEnd = Boolean(t.cep || t.logradouro || t.bairro || t.municipio);
+    const chkEnd = document.getElementById('chkInformarEnderecoTomador');
+    if (chkEnd) {
+      chkEnd.checked = temEnd;
+      this.toggleEnderecoTomador();
+    }
+
+    if (temEnd) {
+      setVal('fTomadorCep', t.cep || '');
+      setVal('fTomadorLogradouro', t.logradouro || '');
+      setVal('fTomadorNumero', t.numero || '');
+      setVal('fTomadorComplemento', t.complemento || '');
+      setVal('fTomadorBairro', t.bairro || '');
+      setVal('fTomadorMunicipio', t.municipio || '');
+      setVal('fTomadorUf', t.uf || 'SE');
+    }
+
+    const badge = document.getElementById('badgeCnpjOnline');
+    if (badge) {
+      badge.innerText = '✓ Selecionado do Histórico';
+      badge.classList.remove('hidden');
+    }
+
+    this.validateEmissionStep(1);
+    this.saveEmissionDraft();
+    this.closeRecentTomadoresModal();
+    this.showToast(`Tomador "${t.nome}" preenchido com sucesso!`, 'success');
   },
 
   renderRevisionSummary() {
