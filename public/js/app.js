@@ -4,13 +4,13 @@
  */
 
 /**
- * Helper seguro para requisições com injeção automática de sessão isolada (multi-usuário)
+ * Helper seguro para requisições com injeção automática de sessão isolada (multi-usuário) e autenticação
  */
 async function safeFetchJson(url, options = {}) {
   const opts = { ...options };
   opts.headers = { ...(opts.headers || {}) };
 
-  // Injeta automaticamente o Session-ID e o CNPJ da empresa representada ativa deste navegador
+  // Injeta automaticamente o Session-ID, o CNPJ da empresa representada ativa e o token de autenticação
   try {
     let sessId = localStorage.getItem('nfse_session_id');
     if (!sessId) {
@@ -25,6 +25,11 @@ async function safeFetchJson(url, options = {}) {
     if (activeCnpj && !opts.headers['X-Represented-CNPJ']) {
       opts.headers['X-Represented-CNPJ'] = activeCnpj;
     }
+
+    const token = localStorage.getItem('nfse_auth_token') || sessionStorage.getItem('nfse_auth_token');
+    if (token && !opts.headers['Authorization']) {
+      opts.headers['Authorization'] = `Bearer ${token}`;
+    }
   } catch (_) {}
 
   const res = await fetch(url, opts);
@@ -38,6 +43,145 @@ async function safeFetchJson(url, options = {}) {
     throw new Error(text || res.statusText || 'Erro ao processar resposta do servidor.');
   }
 }
+
+// ==========================================
+// MÓDULO DE AUTENTICAÇÃO DO USUÁRIO
+// ==========================================
+const Auth = {
+  TOKEN_KEY: 'nfse_auth_token',
+  USER_KEY: 'nfse_auth_user',
+
+  getToken() {
+    try {
+      return localStorage.getItem(this.TOKEN_KEY) || sessionStorage.getItem(this.TOKEN_KEY) || null;
+    } catch (_) {
+      return null;
+    }
+  },
+
+  getUser() {
+    try {
+      const u = localStorage.getItem(this.USER_KEY) || sessionStorage.getItem(this.USER_KEY);
+      return u ? JSON.parse(u) : null;
+    } catch (_) {
+      return null;
+    }
+  },
+
+  isAuthenticated() {
+    return Boolean(this.getToken());
+  },
+
+  checkAuthAndInit() {
+    const isAuth = this.isAuthenticated();
+    const loginScreen = document.getElementById('loginScreen');
+    const mainApp = document.getElementById('mainAppWrapper');
+
+    if (isAuth) {
+      if (loginScreen) loginScreen.classList.add('hidden');
+      if (mainApp) mainApp.classList.remove('hidden');
+      document.documentElement.classList.add('is-authenticated');
+
+      const user = this.getUser();
+      const userEl = document.getElementById('topAuthUserName');
+      if (userEl && user) userEl.innerText = user.username || 'bazilioconta';
+
+      if (!window.__appInitialized) {
+        window.__appInitialized = true;
+        App.init();
+      }
+    } else {
+      if (loginScreen) loginScreen.classList.remove('hidden');
+      if (mainApp) mainApp.classList.add('hidden');
+      document.documentElement.classList.remove('is-authenticated');
+      if (window.lucide) lucide.createIcons();
+    }
+  },
+
+  async handleLoginSubmit(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const errAlert = document.getElementById('loginErrorAlert');
+    const errText = document.getElementById('loginErrorText');
+    const btn = document.getElementById('btnLoginSubmit');
+    const origBtnHtml = btn ? btn.innerHTML : '';
+
+    const username = (document.getElementById('loginUsername')?.value || '').trim();
+    const password = (document.getElementById('loginPassword')?.value || '').trim();
+    const rememberMe = document.getElementById('loginRememberMe')?.checked !== false;
+
+    if (!username || !password) {
+      if (errAlert) errAlert.classList.remove('hidden');
+      if (errText) errText.innerText = 'Por favor, preencha o usuário e a senha.';
+      return;
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<span class="animate-spin inline-block mr-2">⌛</span> Entrando...`;
+    }
+    if (errAlert) errAlert.classList.add('hidden');
+
+    try {
+      const res = await safeFetchJson('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+
+      if (!res.success) {
+        throw new Error(res.error || 'Credenciais inválidas.');
+      }
+
+      // Salva conforme escolha de "Manter conectado"
+      if (rememberMe) {
+        localStorage.setItem(this.TOKEN_KEY, res.token);
+        localStorage.setItem(this.USER_KEY, JSON.stringify(res.user));
+        sessionStorage.removeItem(this.TOKEN_KEY);
+        sessionStorage.removeItem(this.USER_KEY);
+      } else {
+        sessionStorage.setItem(this.TOKEN_KEY, res.token);
+        sessionStorage.setItem(this.USER_KEY, JSON.stringify(res.user));
+        localStorage.removeItem(this.TOKEN_KEY);
+        localStorage.removeItem(this.USER_KEY);
+      }
+
+      // Transiciona para o aplicativo
+      this.checkAuthAndInit();
+    } catch (err) {
+      if (errAlert) errAlert.classList.remove('hidden');
+      if (errText) errText.innerText = err.message || 'Usuário ou senha incorretos.';
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = origBtnHtml;
+        if (window.lucide) lucide.createIcons();
+      }
+    }
+  },
+
+  togglePasswordVisibility() {
+    const input = document.getElementById('loginPassword');
+    const icon = document.getElementById('loginPasswordEyeIcon');
+    if (!input) return;
+    if (input.type === 'password') {
+      input.type = 'text';
+      if (icon) icon.setAttribute('data-lucide', 'eye-off');
+    } else {
+      input.type = 'password';
+      if (icon) icon.setAttribute('data-lucide', 'eye');
+    }
+    if (window.lucide) lucide.createIcons();
+  },
+
+  logout() {
+    if (!confirm('Deseja realmente sair do sistema?')) return;
+    localStorage.removeItem(this.TOKEN_KEY);
+    localStorage.removeItem(this.USER_KEY);
+    sessionStorage.removeItem(this.TOKEN_KEY);
+    sessionStorage.removeItem(this.USER_KEY);
+    window.location.reload();
+  }
+};
 
 const IBGE_MUNICIPIOS_MAP = {
   '2800308': 'Aracaju/SE',
@@ -6405,4 +6549,7 @@ document.addEventListener('click', (e) => {
 });
 
 window.App = App;
-window.addEventListener('DOMContentLoaded', () => App.init());
+window.Auth = Auth;
+window.addEventListener('DOMContentLoaded', () => {
+  Auth.checkAuthAndInit();
+});

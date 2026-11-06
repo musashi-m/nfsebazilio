@@ -25,6 +25,14 @@
       } else {
         document.documentElement.classList.remove('dark');
       }
+
+      // Verificação rápida de autenticação para evitar oscilação da tela
+      try {
+        var token = localStorage.getItem('nfse_auth_token') || sessionStorage.getItem('nfse_auth_token');
+        if (token) {
+          document.documentElement.classList.add('is-authenticated');
+        }
+      } catch (_) {}
     })();
 
     tailwind.config = {
@@ -45,8 +53,207 @@
       }
     }
   </script>
+  <style>
+    /* Proteção anti-flicker de autenticação */
+    html:not(.is-authenticated) #mainAppWrapper {
+      display: none !important;
+    }
+    html.is-authenticated #loginScreen {
+      display: none !important;
+    }
+  </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col font-sans">
+
+  <!-- ======================================================= -->
+  <!-- TELA DE LOGIN / AUTENTICAÇÃO (MOCKUP NOTAFÁCIL) -->
+  <!-- ======================================================= -->
+  <div id="loginScreen" class="fixed inset-0 z-50 min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col lg:flex-row overflow-y-auto">
+    <!-- Coluna Esquerda: Banner Institucional Azul Noturno com Curva Orgânica -->
+    <div class="lg:w-[56%] bg-gradient-to-br from-[#0c53c4] via-[#09409b] to-[#042456] text-white p-8 lg:p-14 flex flex-col justify-between relative overflow-hidden shrink-0">
+      
+      <!-- Topo: Marca NotaFácil -->
+      <div class="flex items-center space-x-3.5 z-10">
+        <div class="w-11 h-11 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-xl">
+          <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <line x1="10" y1="9" x2="8" y2="9"></line>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-2xl font-black tracking-tight text-white flex items-center">Nota<span class="text-sky-300">Fácil</span></h1>
+          <p class="text-xs text-sky-200/90 font-medium">ERP de Emissão de NFS-e</p>
+        </div>
+      </div>
+
+      <!-- Centro: Proposta de Valor e Lista de Benefícios -->
+      <div class="my-auto py-8 z-10 max-w-lg">
+        <h2 class="text-2xl sm:text-3xl xl:text-4xl font-extrabold text-white tracking-tight leading-snug mb-8">
+          Emita e gerencie suas NFS-e com facilidade
+        </h2>
+
+        <ul class="space-y-4 text-sm sm:text-base font-semibold text-blue-50/95 mb-8">
+          <li class="flex items-center space-x-3.5">
+            <div class="w-6 h-6 rounded-full bg-sky-400/25 border border-sky-300/40 text-sky-300 flex items-center justify-center shrink-0">
+              <i data-lucide="check" class="w-3.5 h-3.5 stroke-[3]"></i>
+            </div>
+            <span>Emissão de NFS-e</span>
+          </li>
+          <li class="flex items-center space-x-3.5">
+            <div class="w-6 h-6 rounded-full bg-sky-400/25 border border-sky-300/40 text-sky-300 flex items-center justify-center shrink-0">
+              <i data-lucide="check" class="w-3.5 h-3.5 stroke-[3]"></i>
+            </div>
+            <span>Gestão de clientes e serviços</span>
+          </li>
+          <li class="flex items-center space-x-3.5">
+            <div class="w-6 h-6 rounded-full bg-sky-400/25 border border-sky-300/40 text-sky-300 flex items-center justify-center shrink-0">
+              <i data-lucide="check" class="w-3.5 h-3.5 stroke-[3]"></i>
+            </div>
+            <span>Controle financeiro</span>
+          </li>
+          <li class="flex items-center space-x-3.5">
+            <div class="w-6 h-6 rounded-full bg-sky-400/25 border border-sky-300/40 text-sky-300 flex items-center justify-center shrink-0">
+              <i data-lucide="check" class="w-3.5 h-3.5 stroke-[3]"></i>
+            </div>
+            <span>Relatórios e consultas</span>
+          </li>
+        </ul>
+
+        <!-- Ilustração Mockup do Laptop com NFS-e -->
+        <div class="relative w-full max-w-[400px] mx-auto mt-6">
+          <!-- Sparkles -->
+          <div class="absolute -top-4 right-8 text-sky-300 animate-pulse">
+            <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <path d="M12 3v3M12 18v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M3 12h3M18 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>
+            </svg>
+          </div>
+          <!-- Laptop Graphic SVG -->
+          <svg class="w-full h-auto drop-shadow-2xl" viewBox="0 0 460 280" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <ellipse cx="230" cy="265" rx="190" ry="12" fill="#021636" opacity="0.45" filter="blur(6px)"/>
+            <!-- Screen frame -->
+            <rect x="70" y="20" width="320" height="205" rx="16" fill="#0b244d" stroke="#2563eb" stroke-width="3"/>
+            <!-- Screen display -->
+            <rect x="82" y="32" width="296" height="181" rx="10" fill="#17356d"/>
+            
+            <!-- Document inside screen -->
+            <g transform="translate(130, 44)">
+              <rect x="0" y="0" width="200" height="156" rx="12" fill="#ffffff" filter="drop-shadow(0 10px 18px rgba(0,0,0,0.3))"/>
+              <text x="100" y="42" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="26" fill="#0052cc" text-anchor="middle">NFS-e</text>
+              <rect x="30" y="60" width="140" height="9" rx="4.5" fill="#93c5fd" opacity="0.95"/>
+              <rect x="30" y="77" width="110" height="9" rx="4.5" fill="#bfdbfe" opacity="0.85"/>
+              <rect x="30" y="94" width="125" height="9" rx="4.5" fill="#dbeafe" opacity="0.75"/>
+              <g transform="translate(100, 126)">
+                <circle cx="0" cy="0" r="18" fill="#10b981"/>
+                <path d="M-7 0 L-2 5 L7 -5" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </g>
+            </g>
+
+            <!-- Keyboard base -->
+            <path d="M35 228 L425 228 L400 254 L60 254 Z" fill="#1e40af" stroke="#3b82f6" stroke-width="2"/>
+            <rect x="190" y="233" width="80" height="8" rx="4" fill="#93c5fd" opacity="0.5"/>
+            <path d="M25 252 L435 252 L420 262 L40 262 Z" fill="#0f172a" opacity="0.7"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Rodapé discreto no banner -->
+      <div class="z-10 text-[11px] text-blue-200/70">
+        &copy; 2026 Bazilio & Silva Contabilidade • Conexão Direta RFB
+      </div>
+
+      <!-- Divisor com Curva Orgânica Suave (Desktop) -->
+      <div class="hidden lg:block absolute top-0 bottom-0 right-0 w-24 h-full pointer-events-none select-none">
+        <svg class="h-full w-full text-slate-50 dark:text-slate-950 fill-current" viewBox="0 0 100 1000" preserveAspectRatio="none">
+          <path d="M100,0 C30,300 15,650 100,1000 L100,0 Z"></path>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Coluna Direita: Formulário de Autenticação Limpo -->
+    <div class="lg:w-[44%] flex-1 bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6 sm:p-12 lg:p-16 relative">
+      <div class="w-full max-w-sm sm:max-w-md mx-auto space-y-7 bg-white dark:bg-slate-900 p-8 sm:p-10 rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-200/80 dark:border-slate-800">
+        
+        <!-- Logo no card de login -->
+        <div class="flex items-center space-x-3">
+          <div class="w-11 h-11 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+            <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <line x1="10" y1="9" x2="8" y2="9"></line>
+            </svg>
+          </div>
+          <span class="text-3xl font-black tracking-tight text-blue-600 dark:text-blue-400">Nota<span class="text-blue-800 dark:text-sky-300">Fácil</span></span>
+        </div>
+
+        <!-- Título de Boas-vindas -->
+        <div>
+          <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Acesse sua conta</h2>
+          <p class="text-sm text-slate-500 dark:text-slate-400 mt-1.5">Entre no seu ERP e comece a emitir suas NFS-e.</p>
+        </div>
+
+        <!-- Alerta de Erro -->
+        <div id="loginErrorAlert" class="hidden p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 text-rose-700 dark:text-rose-300 text-xs flex items-center space-x-2.5">
+          <i data-lucide="alert-circle" class="w-4 h-4 shrink-0 text-rose-500"></i>
+          <span id="loginErrorText" class="font-medium">Usuário ou senha incorretos.</span>
+        </div>
+
+        <!-- Formulário de Login -->
+        <form id="loginForm" onsubmit="Auth.handleLoginSubmit(event)" class="space-y-5">
+          <!-- Campo E-mail / Usuário -->
+          <div>
+            <label for="loginUsername" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">E-mail</label>
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <i data-lucide="mail" class="w-4 h-4"></i>
+              </div>
+              <input type="text" id="loginUsername" name="username" autocomplete="username" required
+                placeholder="seu@email.com"
+                class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all placeholder:text-slate-400 font-medium">
+            </div>
+          </div>
+
+          <!-- Campo Senha com Mostrar/Ocultar -->
+          <div>
+            <label for="loginPassword" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Senha</label>
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <i data-lucide="lock" class="w-4 h-4"></i>
+              </div>
+              <input type="password" id="loginPassword" name="password" autocomplete="current-password" required
+                placeholder="Sua senha"
+                class="w-full pl-10 pr-11 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all placeholder:text-slate-400 font-medium">
+              <button type="button" onclick="Auth.togglePasswordVisibility()" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                <i id="loginPasswordEyeIcon" data-lucide="eye" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Manter Conectado e Esqueci minha senha -->
+          <div class="flex items-center justify-between text-xs pt-1">
+            <label class="flex items-center space-x-2 text-slate-600 dark:text-slate-300 cursor-pointer select-none">
+              <input type="checkbox" id="loginRememberMe" checked class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer">
+              <span>Manter conectado</span>
+            </label>
+            <a href="javascript:void(0)" onclick="alert('Por favor, solicite a redefinição de suas credenciais ao administrador contábil.')" class="text-blue-600 hover:text-blue-700 dark:text-blue-400 font-semibold hover:underline">Esqueci minha senha</a>
+          </div>
+
+          <!-- Botão Entrar -->
+          <button type="submit" id="btnLoginSubmit" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-sm rounded-xl shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center space-x-2 group">
+            <span>Entrar</span>
+            <i data-lucide="arrow-right" class="w-4 h-4 group-hover:translate-x-1 transition-transform"></i>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Invólucro Principal da Aplicação (Oculto até autenticar) -->
+  <div id="mainAppWrapper" class="min-h-screen flex flex-col">
 
   <!-- Topbar Header Principal -->
   <header class="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-40 shadow-md">
@@ -87,6 +294,19 @@
         <button id="btnToggleTheme" onclick="App.toggleTheme()" class="p-2 bg-slate-800 hover:bg-slate-700/80 border border-slate-700 rounded-xl text-slate-300 hover:text-amber-400 transition-colors shadow-sm flex items-center justify-center shrink-0" title="Alternar entre Tema Claro e Tema Noturno">
           <i id="themeToggleIcon" data-lucide="moon" class="w-4 h-4"></i>
         </button>
+
+        <!-- Usuário Autenticado e Botão Sair -->
+        <div class="flex items-center pl-2.5 border-l border-slate-700 space-x-2">
+          <div class="hidden sm:flex items-center space-x-2 bg-slate-800/90 px-3 py-1.5 rounded-xl border border-slate-700 text-xs shadow-inner">
+            <div class="w-5 h-5 rounded-md bg-blue-500/20 text-blue-400 flex items-center justify-center">
+              <i data-lucide="user" class="w-3.5 h-3.5"></i>
+            </div>
+            <span id="topAuthUserName" class="font-bold text-slate-200">bazilioconta</span>
+          </div>
+          <button onclick="Auth.logout()" class="p-2 bg-slate-800 hover:bg-rose-950/60 hover:text-rose-400 border border-slate-700 hover:border-rose-800/80 rounded-xl text-slate-400 transition-all shadow-sm flex items-center justify-center shrink-0 group" title="Sair do Sistema">
+            <i data-lucide="log-out" class="w-4 h-4 group-hover:translate-x-0.5 transition-transform"></i>
+          </button>
+        </div>
       </div>
     </div>
   </header>
@@ -3026,11 +3246,13 @@
     </div>
   </div>
 
+  </div> <!-- /#mainAppWrapper -->
+
   <!-- Scripts da Aplicação -->
-  <script src="js/municipios.js?v=3.3"></script>
-  <script src="js/errorModal.js?v=3.3"></script>
-  <script src="js/html2pdf.bundle.min.js?v=3.3"></script>
-  <script src="js/danfseViewer.js?v=3.3"></script>
-  <script src="js/app.js?v=3.3"></script>
+  <script src="js/municipios.js?v=3.4"></script>
+  <script src="js/errorModal.js?v=3.4"></script>
+  <script src="js/html2pdf.bundle.min.js?v=3.4"></script>
+  <script src="js/danfseViewer.js?v=3.4"></script>
+  <script src="js/app.js?v=3.4"></script>
 </body>
 </html>

@@ -80,6 +80,49 @@ function resolveSessionCnpj(req) {
 }
 
 // ==========================================
+// AUTENTICAÇÃO DE ACESSO (USUÁRIO E SENHA)
+// ==========================================
+const AUTH_USER = 'bazilioconta';
+const AUTH_PASS = 'bazilio7001';
+const AUTH_SECRET = 'bazilio_secret_token_2026';
+
+app.post('/api/auth/login', (req, res) => {
+  const { username, password } = req.body;
+  const cleanUser = String(username || '').trim().toLowerCase();
+  const cleanPass = String(password || '').trim();
+
+  if ((cleanUser === AUTH_USER.toLowerCase() || cleanUser === 'bazilioconta@email.com') && cleanPass === AUTH_PASS) {
+    const token = Buffer.from(`${AUTH_USER}:${Date.now()}:${AUTH_SECRET}`).toString('base64');
+    return res.json({
+      success: true,
+      token,
+      user: {
+        username: AUTH_USER,
+        name: 'Bazilio & Silva Contabilidade'
+      }
+    });
+  }
+
+  return res.status(401).json({
+    success: false,
+    error: 'Usuário ou senha incorretos. Verifique suas credenciais.'
+  });
+});
+
+app.get('/api/auth/verify', (req, res) => {
+  const authHeader = req.headers['authorization'];
+  if (!authHeader) return res.status(401).json({ valid: false });
+  const token = authHeader.replace('Bearer ', '').trim();
+  try {
+    const decoded = Buffer.from(token, 'base64').toString('utf8');
+    if (decoded.includes(AUTH_USER) && decoded.includes(AUTH_SECRET)) {
+      return res.json({ valid: true, user: { username: AUTH_USER } });
+    }
+  } catch (_) {}
+  return res.status(401).json({ valid: false });
+});
+
+// ==========================================
 // ROTAS DE STATUS E AMBIENTES
 // ==========================================
 

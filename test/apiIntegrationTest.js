@@ -101,11 +101,39 @@ async function runApiTests() {
     }
     console.log('✓ [MULTI-USUÁRIO] Isolamento Concorrente entre Sessões A e B: 100% ISOLADAS E INDEPENDENTES');
 
-    // 6. Lista de Representações Recentes
+    // 6. Teste de Autenticação (Login e Verificação de Token)
+    const loginOk = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'bazilioconta', password: 'bazilio7001' })
+    }).then(r => r.json());
+
+    if (!loginOk.success || !loginOk.token) {
+      throw new Error('Falha no login com credenciais corretas');
+    }
+
+    const loginFail = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'bazilioconta', password: 'senha_errada' })
+    });
+    if (loginFail.status !== 401) {
+      throw new Error(`Login com senha errada deveria retornar 401, retornou ${loginFail.status}`);
+    }
+
+    const verifyOk = await fetch(`${baseUrl}/api/auth/verify`, {
+      headers: { 'Authorization': `Bearer ${loginOk.token}` }
+    }).then(r => r.json());
+    if (!verifyOk.valid) {
+      throw new Error('Falha na validação do token recém-gerado');
+    }
+    console.log('✓ /api/auth: Login e Validação de Sessão Segura Hardcoded OK (bazilioconta)');
+
+    // 7. Lista de Representações Recentes
     const recentsRes = await fetch(`${baseUrl}/api/representation/recent`).then(r => r.json());
     console.log('✓ /api/representation/recent: Total de recentes:', recentsRes.length);
 
-    // 7. Teste de Conectividade e Diagnóstico Completo
+    // 8. Teste de Conectividade e Diagnóstico Completo
     const connRes = await fetch(`${baseUrl}/api/connectivity/test`, { method: 'POST' }).then(r => r.json());
     console.log('✓ /api/connectivity/test: Status Geral:', connRes.overallStatus, '| RFB:', connRes.rfbDirect.endpoint);
 
