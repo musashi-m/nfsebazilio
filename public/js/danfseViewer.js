@@ -41,13 +41,13 @@ class DanfseViewer {
                 <i data-lucide="file-code" class="w-3.5 h-3.5"></i>
                 <span>Baixar XML</span>
               </button>
-              <button onclick="window.danfseViewer.downloadPdf()" id="btnDanfseDownloadPdf" class="px-4 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg flex items-center space-x-1.5 shadow-sm transition-colors">
-                <i data-lucide="file-down" class="w-4 h-4"></i>
+              <button onclick="window.danfseViewer.downloadPdf()" id="btnDanfseDownloadPdf" class="px-3.5 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg flex items-center space-x-1.5 transition-colors border border-slate-700" title="Baixa o arquivo PDF direto para a pasta Downloads">
+                <i data-lucide="file-down" class="w-3.5 h-3.5"></i>
                 <span id="btnDanfseDownloadPdfText">Baixar PDF</span>
               </button>
-              <button onclick="window.danfseViewer.print()" class="px-3 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg flex items-center space-x-1.5 transition-colors border border-slate-700">
-                <i data-lucide="printer" class="w-3.5 h-3.5"></i>
-                <span>Imprimir</span>
+              <button onclick="window.danfseViewer.print()" class="px-4 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg flex items-center space-x-1.5 shadow-sm transition-colors" title="Gera o PDF com texto 100% selecionável e copiável (Ctrl+C)">
+                <i data-lucide="printer" class="w-4 h-4"></i>
+                <span>PDF com Texto Copiável / Imprimir</span>
               </button>
               <button onclick="window.danfseViewer.close()" class="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors ml-1">
                 <i data-lucide="x" class="w-5 h-5"></i>
