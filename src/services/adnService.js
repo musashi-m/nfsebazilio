@@ -440,20 +440,6 @@ class AdnService {
           const atNoLote = (typeof batchRes === 'object' && batchRes.atualizadas !== undefined) ? batchRes.atualizadas : 0;
           totalNovas += novasNoLote;
           totalAtualizadas += atNoLote;
-
-          // Auto-enriquece cadastro de empresas com os dados oficiais do lote
-          try {
-            const repService = require('./representationService');
-            for (const item of currentBatchParsed) {
-              if (item.prestador && item.prestador.cnpjRaw && item.prestador.razaoSocial && !item.prestador.razaoSocial.startsWith('EMPRESA CNPJ')) {
-                const existing = storageService.getCompanies().find(c => c.cnpjRaw === item.prestador.cnpjRaw);
-                if (!existing || !existing.logradouro || existing.razaoSocial.startsWith('EMPRESA CNPJ')) {
-                  const resolved = repService._findCompanyInHistory(item.prestador.cnpjRaw);
-                  if (resolved) storageService.saveCompany(resolved);
-                }
-              }
-            }
-          } catch (_) {}
         }
 
         // Atualiza o ponteiro de NSU persistido (garante que nunca regrida abaixo do consolidado)

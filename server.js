@@ -931,6 +931,10 @@ app.get('/api/municipios', (req, res) => {
 
 // Inicia servidor apenas se executado diretamente
 if (require.main === module) {
+  try {
+    storageService.cleanupVendorCompanies();
+  } catch (_) {}
+
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`=======================================================`);
     console.log(`  EMISSOR NACIONAL DE NOTAS FISCAIS (NFS-e ADN / RFB)  `);

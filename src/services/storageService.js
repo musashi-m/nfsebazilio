@@ -463,7 +463,51 @@ class StorageService {
 
   // --- EMPRESAS REPRESENTADAS ---
   getCompanies() {
-    return this._readJson(COMPANIES_FILE, []);
+    const list = this._readJson(COMPANIES_FILE, []);
+    const VENDOR_BLOCKLIST = new Set([
+      '13347016000117', // FACEBOOK
+      '34052649000178', // CORA
+      '39768096000178', // ACESSORIAS
+      '06990590000123', // GOOGLE BRASIL
+      '25012398000107', // GOOGLE CLOUD
+      '13360276000122', // UNIMED
+      '03916076000664', // ZUCCHETTI
+      '64555626000147', // AO3
+      '13673743000255', // BOM NEGOCIO (OLX)
+      '13021784000186', // RD GESTAO (RD STATION)
+      '01524509000104', // PELLI SISTEMAS
+      '21730190000172', // PUGLISI
+      '32313639000113', // SUPREMACY DIGITAL
+      '04693497000121', // ZIPLINE
+      '09199402000131', // GARCIA MORENO
+      '45844225000162', // OLIVEIRA RESOLVE
+      '44905104000110', // CLIMATIZACAO CENTRAL
+      '43017958000106', // LIMP BEM
+      '10956453000140', // OURO MODERNO
+      '11056004000108', // ULTRA CURSOS
+      '45437689000154', // MATE INCENDIO
+      '29045626000104', // INFE INFORMACOES TRIBUTARIAS
+      '59170974000166', // MATTIAZZO OFFICE FAROLANDIA
+      '48888112000157', // MATTIAZZO OFFICE
+      '53210705000108', // BELMONT & LUCAS
+      '10704608000150', // ACESSE SERVICOS ESCRITORIO
+      '32856932000127', // R PEREIRA COMERCIAL
+      '51167412000151', // DANILO MELO
+      '40634440000115', // ERCIO DE FARIAS
+      '12345678000195'  // TEST
+    ]);
+    return list.filter(c => c.cnpjRaw && !VENDOR_BLOCKLIST.has(c.cnpjRaw));
+  }
+
+  cleanupVendorCompanies() {
+    const list = this._readJson(COMPANIES_FILE, []);
+    if (!list || list.length === 0) return 0;
+    const cleanList = this.getCompanies();
+    if (cleanList.length !== list.length) {
+      console.log(`[Storage] Limpeza de empresas: removidos ${list.length - cleanList.length} fornecedores de notas tomadas do catalogo.`);
+      this._writeJson(COMPANIES_FILE, cleanList);
+    }
+    return list.length - cleanList.length;
   }
 
   saveCompany(company) {
