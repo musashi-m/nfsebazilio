@@ -41,13 +41,9 @@ class DanfseViewer {
                 <i data-lucide="file-code" class="w-3.5 h-3.5"></i>
                 <span>Baixar XML</span>
               </button>
-              <button onclick="window.danfseViewer.downloadPdf()" id="btnDanfseDownloadPdf" class="px-3.5 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg flex items-center space-x-1.5 transition-colors border border-slate-700" title="Baixa o arquivo PDF direto para a pasta Downloads">
-                <i data-lucide="file-down" class="w-3.5 h-3.5"></i>
-                <span id="btnDanfseDownloadPdfText">Baixar PDF</span>
-              </button>
-              <button onclick="window.danfseViewer.print()" class="px-4 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg flex items-center space-x-1.5 shadow-sm transition-colors" title="Gera o PDF com texto 100% selecionável e copiável (Ctrl+C)">
-                <i data-lucide="printer" class="w-4 h-4"></i>
-                <span>PDF com Texto Copiável / Imprimir</span>
+              <button onclick="window.danfseViewer.downloadPdf()" id="btnDanfseDownloadPdf" class="px-4 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg flex items-center space-x-1.5 shadow-sm transition-colors" title="Baixar DANFSE em PDF com texto legível e copiável">
+                <i data-lucide="file-down" class="w-4 h-4"></i>
+                <span id="btnDanfseDownloadPdfText">Baixar DANFSE</span>
               </button>
               <button onclick="window.danfseViewer.close()" class="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors ml-1">
                 <i data-lucide="x" class="w-5 h-5"></i>
@@ -88,6 +84,49 @@ class DanfseViewer {
     window.print();
   }
 
+  addSelectableTextLayer(pdf, docEl, marginX = 5, marginY = 4) {
+    try {
+      const docRect = docEl.getBoundingClientRect();
+      if (!docRect || !docRect.width) return;
+      const scaleX = 200 / docRect.width;
+
+      if (pdf.internal && pdf.internal.write) {
+        // Modo 3 Tr = texto invisível ao olho (preserva o visual oficial da tabela),
+        // mas 100% selecionável com o mouse e copiável (Ctrl+C / Ctrl+F) no PDF!
+        pdf.internal.write('3 Tr');
+      }
+
+      const textElements = docEl.querySelectorAll('.danfse-val, .danfse-lbl, .danfse-chave-num, .danfse-title-main, .danfse-title-sub, .danfse-sec-title, td, th, div, span, p');
+      const seen = new Set();
+
+      textElements.forEach(el => {
+        if (el.children.length > 0 && Array.from(el.children).some(c => (c.textContent || '').trim())) return;
+        const text = (el.textContent || '').trim();
+        if (!text || text === '-') return;
+
+        const r = el.getBoundingClientRect();
+        if (r.width === 0 || r.height === 0) return;
+
+        const relX = (r.left - docRect.left) * scaleX + marginX;
+        const relY = (r.top - docRect.top) * scaleX + marginY + (r.height * scaleX * 0.82);
+
+        const computed = window.getComputedStyle(el);
+        const fontSizePt = parseFloat(computed.fontSize) * 0.75 || 7;
+
+        const key = `${Math.round(relX)}_${Math.round(relY)}_${text}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+
+        try {
+          pdf.setFontSize(Math.max(5, Math.min(13, fontSizePt)));
+          pdf.text(text, Math.max(0, relX), Math.max(0, relY));
+        } catch (_) {}
+      });
+    } catch (e) {
+      console.warn('Aviso ao gerar camada de texto selecionável:', e);
+    }
+  }
+
   async downloadPdf(nfse = null) {
     const targetNfse = nfse || this.currentNfse;
     if (!targetNfse) {
@@ -109,7 +148,7 @@ class DanfseViewer {
     const oldHtml = btn ? btn.innerHTML : '';
     if (btn) {
       btn.disabled = true;
-      btn.innerHTML = `<span class="animate-spin inline-block text-xs mr-1">⌛</span><span>Gerando PDF...</span>`;
+      btn.innerHTML = `<span class="animate-spin inline-block text-xs mr-1">⌛</span><span>Gerando DANFSE...</span>`;
     }
 
     try {
@@ -161,7 +200,11 @@ class DanfseViewer {
       };
 
       if (typeof html2pdf !== 'undefined') {
-        const pdfBlob = await html2pdf().set(opt).from(docEl).output('blob');
+        const worker = html2pdf().set(opt).from(docEl).toPdf().get('pdf').then((pdf) => {
+          this.addSelectableTextLayer(pdf, docEl, 5, 4);
+        });
+
+        const pdfBlob = await worker.output('blob');
         const blobUrl = URL.createObjectURL(pdfBlob);
         const a = document.createElement('a');
         a.href = blobUrl;
