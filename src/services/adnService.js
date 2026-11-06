@@ -329,7 +329,9 @@ class AdnService {
     }
 
     const syncState = storageService.getNsuState(cleanCnpj);
-    let currentNsu = options.startFromZero ? 0 : (syncState.ultNSU || 0);
+    const existingNotes = storageService.getHistory({ prestadorCnpj: cleanCnpj });
+    // Se a empresa não possui notas registradas no acervo local, sincroniza automaticamente desde o início (NSU 0)
+    let currentNsu = (options.startFromZero || existingNotes.length === 0) ? 0 : (syncState.ultNSU || 0);
     const maxBatches = options.maxBatches || 50; // Até 2.500 documentos por sincronização
     let totalSincronizadas = 0;
     let totalEventos = 0;
