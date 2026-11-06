@@ -258,7 +258,12 @@ class StorageService {
   }
 
   saveNfseBatch(records = []) {
-    if (!records || records.length === 0) return 0;
+    if (!records || records.length === 0) {
+      const emptyRes = { addedOrUpdated: 0, novas: 0, atualizadas: 0 };
+      emptyRes[Symbol.toPrimitive] = () => 0;
+      emptyRes.valueOf = () => 0;
+      return emptyRes;
+    }
     const list = this._getHistoryRaw();
     const map = new Map();
     for (const item of list) {
@@ -269,6 +274,8 @@ class StorageService {
     }
 
     let addedOrUpdated = 0;
+    let novas = 0;
+    let atualizadas = 0;
     for (const rec of records) {
       if (!rec || !rec.chaveAcesso) continue;
       const cleanKey = rec.chaveAcesso.replace(/\D/g, '') || rec.chaveAcesso;
@@ -284,15 +291,20 @@ class StorageService {
           motivoCancelamento: existing.motivoCancelamento || rec.motivoCancelamento,
           updatedAt: new Date().toISOString()
         });
+        atualizadas++;
       } else {
         map.set(cleanKey, { ...rec, createdAt: new Date().toISOString() });
+        novas++;
       }
       addedOrUpdated++;
     }
 
     const merged = Array.from(map.values());
     this._writeHistory(merged);
-    return addedOrUpdated;
+    const result = { addedOrUpdated, novas, atualizadas };
+    result[Symbol.toPrimitive] = () => addedOrUpdated;
+    result.valueOf = () => addedOrUpdated;
+    return result;
   }
 
   getNsuState(cnpj) {

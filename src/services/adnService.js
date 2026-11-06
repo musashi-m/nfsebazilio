@@ -330,10 +330,16 @@ class AdnService {
 
     const syncState = storageService.getNsuState(cleanCnpj);
     const existingNotes = storageService.getHistory({ prestadorCnpj: cleanCnpj });
-    // Se a empresa não possui notas registradas no acervo local, sincroniza automaticamente desde o início (NSU 0)
-    let currentNsu = (options.startFromZero || existingNotes.length === 0) ? 0 : (syncState.ultNSU || 0);
+    const isReset = Boolean(options.startFromZero) || existingNotes.length === 0;
+    const backtrack = typeof options.backtrack === 'number' ? options.backtrack : 5;
+
+    // Se startFromZero ou se a empresa não tiver notas no acervo: inicia em 0 (auto-cura e sincronização completa).
+    // Se sincronização incremental: aplica janela deslizante retroativa (backtrack de 5 NSUs) para revalidar
+    // documentos recentes e eventos/cancelamentos sem deixar nenhum documento para trás.
+    let currentNsu = isReset ? 0 : Math.max(0, (syncState.ultNSU || 0) - backtrack);
     const maxBatches = options.maxBatches || 50; // Até 2.500 documentos por sincronização
-    let totalSincronizadas = 0;
+    let totalNovas = 0;
+    let totalAtualizadas = 0;
     let totalEventos = 0;
     let batchCount = 0;
     const parsedRecords = [];
@@ -427,10 +433,13 @@ class AdnService {
           }
         }
 
-        // Salva em lote seguro
+        // Salva em lote seguro e deduplicado
         if (currentBatchParsed.length > 0) {
-          storageService.saveNfseBatch(currentBatchParsed);
-          totalSincronizadas += currentBatchParsed.length;
+          const batchRes = storageService.saveNfseBatch(currentBatchParsed);
+          const novasNoLote = (typeof batchRes === 'object' && batchRes.novas !== undefined) ? batchRes.novas : currentBatchParsed.length;
+          const atNoLote = (typeof batchRes === 'object' && batchRes.atualizadas !== undefined) ? batchRes.atualizadas : 0;
+          totalNovas += novasNoLote;
+          totalAtualizadas += atNoLote;
 
           // Auto-enriquece cadastro de empresas com os dados oficiais do lote
           try {
@@ -447,10 +456,11 @@ class AdnService {
           } catch (_) {}
         }
 
-        // Atualiza o ponteiro de NSU persistido
+        // Atualiza o ponteiro de NSU persistido (garante que nunca regrida abaixo do consolidado)
+        const currentSavedNsu = isReset ? currentNsu : Math.max(syncState.ultNSU || 0, currentNsu);
         storageService.saveNsuState(cleanCnpj, {
-          ultNSU: currentNsu,
-          totalSincronizadas: (syncState.totalSincronizadas || 0) + totalSincronizadas
+          ultNSU: currentSavedNsu,
+          totalSincronizadas: (syncState.totalSincronizadas || 0) + totalNovas
         });
 
         // Se o lote retornou menos de 50 itens, significa que atingiu o último documento disponível no ADN
@@ -459,23 +469,36 @@ class AdnService {
         }
       }
 
+      const finalUltNsu = isReset ? currentNsu : Math.max(syncState.ultNSU || 0, currentNsu);
+      storageService.saveNsuState(cleanCnpj, {
+        ultNSU: finalUltNsu,
+        totalSincronizadas: (syncState.totalSincronizadas || 0) + totalNovas
+      });
+
       return {
         success: true,
-        totalSincronizadas,
+        totalSincronizadas: totalNovas,
+        totalNovas,
+        totalAtualizadas,
         totalEventos,
-        totalModificadas: totalSincronizadas + totalEventos,
-        ultNSU: currentNsu,
+        totalModificadas: totalNovas + totalEventos,
+        ultNSU: finalUltNsu,
         batchesProcessed: batchCount,
         notas: storageService.getHistory({ prestadorCnpj: cleanCnpj }),
         fonte: 'Ambiente de Dados Nacional (Distribuição DF-e Oficial Receita Federal)',
         timestamp: new Date().toISOString()
       };
     } catch (err) {
-      if (err.response && err.response.status === 404) {
+      if (err.response && (err.response.status === 404 || err.response.status === 204)) {
+        const finalUltNsu = isReset ? currentNsu : Math.max(syncState.ultNSU || 0, currentNsu);
         return {
           success: true,
           totalSincronizadas: 0,
-          ultNSU: currentNsu,
+          totalNovas: 0,
+          totalAtualizadas: 0,
+          totalEventos: 0,
+          totalModificadas: 0,
+          ultNSU: finalUltNsu,
           notas: storageService.getHistory({ prestadorCnpj: cleanCnpj }),
           mensagem: 'Nenhum novo documento fiscal localizado no ADN para este CNPJ a partir do NSU informado.',
           fonte: 'Ambiente de Dados Nacional (ADN Oficial)',

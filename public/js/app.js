@@ -3297,18 +3297,22 @@ const App = {
       const res = await fetch('/api/adn/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prestadorCnpj: cnpj, startFromZero: false, maxBatches: 5 })
+        body: JSON.stringify({ prestadorCnpj: cnpj, startFromZero: false, maxBatches: 10 })
       });
       if (res.ok) {
         const data = await res.json();
-        const hasChanges = (data.totalSincronizadas > 0) || (data.totalEventos > 0) || (data.totalModificadas > 0);
+        const hasChanges = (data.totalNovas > 0) || (data.totalSincronizadas > 0) || (data.totalEventos > 0) || (data.totalModificadas > 0);
         if (hasChanges) {
           const fresh = await safeFetchJson(`/api/adn/history?prestadorCnpj=${cnpj}&ambiente=${this.state.currentEnvironment}`);
           this.state.history = fresh.notas || [];
           this.applyHistoryFilters();
           this.renderDashboard();
           this.loadSyncStatus(cnpj);
-          this.showToast('✓ ADN atualizado: novos documentos ou cancelamentos detectados em tempo real!', 'info');
+          const novas = data.totalNovas || data.totalSincronizadas || 0;
+          const msg = data.totalEventos > 0 && novas > 0
+            ? `✓ ADN atualizado: ${novas} nova(s) NFS-e e ${data.totalEventos} evento(s) sincronizados!`
+            : (novas > 0 ? `✓ ADN atualizado: ${novas} nova(s) NFS-e detectada(s) e adicionada(s)!` : `✓ ADN atualizado: status/eventos sincronizados em tempo real!`);
+          this.showToast(msg, 'info');
         }
       }
     } catch (err) {
@@ -4379,13 +4383,14 @@ const App = {
         window.friendlyErrorModal.show(res.error);
       } else {
         await this.loadHistory();
-        const totalNovas = res.totalSincronizadas || 0;
+        const totalNovas = res.totalNovas !== undefined ? res.totalNovas : (res.totalSincronizadas || 0);
         const totalEv = res.totalEventos || 0;
-        const msgToast = totalEv > 0 
+        const totalAt = res.totalAtualizadas || 0;
+        const msgToast = (totalEv > 0 || totalNovas > 0)
           ? `Sincronização ADN concluída! ${totalNovas} nova(s) NFS-e e ${totalEv} cancelamento(s)/evento(s) atualizados.`
-          : `Sincronização com o ADN concluída! Documentos sincronizados: ${totalNovas}`;
+          : `Sincronização com o ADN concluída! Todos os documentos já estão atualizados.`;
         this.showToast(msgToast);
-        alert(`Sincronização ADN Oficial Concluída!\n\nNovas NFS-e baixadas: ${totalNovas}\nEventos / Cancelamentos atualizados: ${totalEv}\nÚltimo NSU da fila: ${res.ultNSU}\nTotal de notas disponíveis: ${res.notas ? res.notas.length : 0}`);
+        alert(`Sincronização ADN Oficial Concluída!\n\nNovas NFS-e baixadas: ${totalNovas}\nEventos / Cancelamentos atualizados: ${totalEv}\nDocumentos verificados/validados: ${totalAt}\nÚltimo NSU da fila: ${res.ultNSU}\nTotal de notas disponíveis: ${res.notas ? res.notas.length : 0}`);
       }
     } catch (e) {
       window.friendlyErrorModal.show({
