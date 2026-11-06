@@ -488,13 +488,13 @@ class DanfseViewer {
     if (pTotTribSN && parseFloat(pTotTribSN) > 0) {
       const pSN = parseFloat(pTotTribSN);
       const valSN = (vServNum * (pSN / 100));
-      infoComp = `Totais aproximados dos Tributos cfe. Lei nº 12.741/2012: Simples Nacional (${pSN.toFixed(2)}%): ${this.formatCurrency(valSN, false)};`;
+      infoComp = `Valor aprox. dos tributos (alíquota Simples Nacional de ${pSN.toFixed(2).replace('.', ',')}%): ${this.formatCurrency(valSN, false)} cfe. Lei 12.741/12.`;
     } else if ((vTotTribFed !== undefined && vTotTribFed !== null) || (vTotTribEst !== undefined && vTotTribEst !== null) || (vTotTribMun !== undefined && vTotTribMun !== null)) {
       const fed = parseFloat(vTotTribFed || 0);
       const est = parseFloat(vTotTribEst || 0);
       const mun = parseFloat(vTotTribMun || 0);
       const tot = fed + est + mun;
-      infoComp = `Totais aproximados dos Tributos cfe. Lei nº 12.741/2012: Federais: ${this.formatCurrency(fed, false)}; Estaduais: ${this.formatCurrency(est, false)}; Municipais: ${this.formatCurrency(mun, false)}; Total: ${this.formatCurrency(tot, false)};`;
+      infoComp = `Valor aprox. dos tributos: Federais: ${this.formatCurrency(fed, false)}; Estaduais: ${this.formatCurrency(est, false)}; Municipais: ${this.formatCurrency(mun, false)}; Total: ${this.formatCurrency(tot, false)} cfe. Lei 12.741/12.`;
     } else if ((pTotTribFed !== undefined && pTotTribFed !== null) || (pTotTribEst !== undefined && pTotTribEst !== null) || (pTotTribMun !== undefined && pTotTribMun !== null)) {
       const pFed = parseFloat(pTotTribFed || 0);
       const pEst = parseFloat(pTotTribEst || 0);
@@ -503,16 +503,16 @@ class DanfseViewer {
       const vEst = (vServNum * (pEst / 100));
       const vMun = (vServNum * (pMun / 100));
       const vTot = vFed + vEst + vMun;
-      infoComp = `Totais aproximados dos Tributos cfe. Lei nº 12.741/2012: Federais: ${this.formatCurrency(vFed, false)} (${pFed.toFixed(2)}%); Estaduais: ${this.formatCurrency(vEst, false)} (${pEst.toFixed(2)}%); Municipais: ${this.formatCurrency(vMun, false)} (${pMun.toFixed(2)}%); Total: ${this.formatCurrency(vTot, false)};`;
+      infoComp = `Valor aprox. dos tributos: Federais: ${this.formatCurrency(vFed, false)} (${pFed.toFixed(2).replace('.', ',')}%), Estaduais: ${this.formatCurrency(vEst, false)} (${pEst.toFixed(2).replace('.', ',')}%), Municipais: ${this.formatCurrency(vMun, false)} (${pMun.toFixed(2).replace('.', ',')}%), Total: ${this.formatCurrency(vTot, false)} cfe. Lei 12.741/12.`;
     } else if (vIss && parseFloat(vIss) > 0) {
-      infoComp = `Totais aproximados dos Tributos cfe. Lei nº 12.741/2012: Federais: -; Estaduais: R$ 0,00; Municipais: ${this.formatCurrency(vIss, false)};`;
+      infoComp = `Valor aprox. dos tributos: Federais: -; Estaduais: R$ 0,00; Municipais: ${this.formatCurrency(vIss, false)} cfe. Lei 12.741/12.`;
     } else {
-      infoComp = `Totais aproximados dos Tributos cfe. Lei nº 12.741/2012: Federais: R$ 0,00; Estaduais: R$ 0,00; Municipais: R$ 0,00;`;
+      infoComp = `Valor aprox. dos tributos: Federais: R$ 0,00; Estaduais: R$ 0,00; Municipais: R$ 0,00 cfe. Lei 12.741/12.`;
     }
 
     const xInfComp = getXml('xInfComp') || nfse.informacoesComplementares || '';
     if (xInfComp) {
-      infoComp = `${infoComp} ${xInfComp}`;
+      infoComp = `${infoComp} | ${xInfComp}`;
     }
 
     return {
