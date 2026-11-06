@@ -782,10 +782,9 @@ class DanfseViewer {
           </tr>
 
           <!-- 5. DESTINATÁRIO E INTERMEDIÁRIO -->
-          ${(!data.tomaDoc || data.tomaDoc === '-' || data.tomaDoc.trim() === '') ? `
           <tr>
             <td colspan="4" class="danfse-bar-neutral">DESTINATÁRIO DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e</td>
-          </tr>` : ''}
+          </tr>
           ${(!data.intermDoc || data.intermDoc === '-' || data.intermDoc.trim() === '') ? `
           <tr>
             <td colspan="4" class="danfse-bar-neutral">INTERMEDIÁRIO DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e</td>
