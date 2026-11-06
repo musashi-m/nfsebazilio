@@ -4,10 +4,30 @@
  */
 
 /**
- * Helper seguro para requisições com tratamento de respostas HTML/404
+ * Helper seguro para requisições com injeção automática de sessão isolada (multi-usuário)
  */
 async function safeFetchJson(url, options = {}) {
-  const res = await fetch(url, options);
+  const opts = { ...options };
+  opts.headers = { ...(opts.headers || {}) };
+
+  // Injeta automaticamente o Session-ID e o CNPJ da empresa representada ativa deste navegador
+  try {
+    let sessId = localStorage.getItem('nfse_session_id');
+    if (!sessId) {
+      sessId = 'sess_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now().toString(36);
+      localStorage.setItem('nfse_session_id', sessId);
+    }
+    if (!opts.headers['X-Session-ID']) {
+      opts.headers['X-Session-ID'] = sessId;
+    }
+
+    const activeCnpj = (window.App?.state?.activeRepresentation?.cnpjRaw || localStorage.getItem('nfse_active_cnpj') || '').replace(/\D/g, '');
+    if (activeCnpj && !opts.headers['X-Represented-CNPJ']) {
+      opts.headers['X-Represented-CNPJ'] = activeCnpj;
+    }
+  } catch (_) {}
+
+  const res = await fetch(url, opts);
   const text = await res.text();
   try {
     return JSON.parse(text);
@@ -299,6 +319,14 @@ const App = {
 
   async loadInitialData() {
     try {
+      // 1. Restaura previamente representação salva no navegador DESTE computador (isolamento de concorrência)
+      const savedRepStr = localStorage.getItem('nfse_active_representation');
+      if (savedRepStr) {
+        try {
+          this.state.activeRepresentation = JSON.parse(savedRepStr);
+        } catch (_) {}
+      }
+
       const [statusRes, auxRes] = await Promise.all([
         safeFetchJson('/api/status'),
         safeFetchJson('/api/aux/ibge-tributos')
@@ -307,7 +335,21 @@ const App = {
       this.state.currentEnvironment = statusRes.currentEnvironment;
       this.state.envConfig = statusRes.envConfig;
       this.state.certificate = statusRes.certificate;
-      this.state.activeRepresentation = statusRes.activeRepresentation || null;
+
+      // 2. Se o status retornou representação ativa para esta sessão, sincroniza
+      if (statusRes.activeRepresentation) {
+        this.state.activeRepresentation = statusRes.activeRepresentation;
+        localStorage.setItem('nfse_active_representation', JSON.stringify(statusRes.activeRepresentation));
+        localStorage.setItem('nfse_active_cnpj', (statusRes.activeRepresentation.cnpjRaw || '').replace(/\D/g, ''));
+      } else if (this.state.activeRepresentation?.cnpjRaw) {
+        // Notifica o servidor para registrar esta sessão caso tenha reiniciado
+        safeFetchJson('/api/representation/representar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ doc: this.state.activeRepresentation.cnpjRaw })
+        }).catch(() => {});
+      }
+
       this.state.recentRepresentations = statusRes.recentRepresentations || [];
       this.state.auxData = auxRes;
 
@@ -588,9 +630,15 @@ const App = {
       // 2. ZERA O HISTÓRICO DA EMPRESA ANTERIOR
       this.state.history = [];
 
-      // 3. ATIVA A NOVA EMPRESA REPRESENTADA
+      // 3. ATIVA A NOVA EMPRESA REPRESENTADA ISOLADAMENTE NESTE NAVEGADOR
       this.state.activeRepresentation = res.representedCompany;
       this.state.recentRepresentations = res.recentRepresentations;
+
+      if (res.representedCompany) {
+        const cDoc = (res.representedCompany.cnpjRaw || cleanDoc).replace(/\D/g, '');
+        localStorage.setItem('nfse_active_cnpj', cDoc);
+        localStorage.setItem('nfse_active_representation', JSON.stringify(res.representedCompany));
+      }
 
       // 4. PREENCHE O FORMULÁRIO COM AS INFORMAÇÕES EXCLUSIVAS DA NOVA REPRESENTADA
       this.fillEmissionFormWithRepresentation(res.representedCompany);

@@ -416,8 +416,9 @@ class RepresentationService {
   /**
    * Representar uma empresa ou pessoa física por CNPJ ou CPF
    * @param {string} docRaw - CNPJ (14 dígitos) ou CPF (11 dígitos)
+   * @param {string|null} sessionId - ID da sessão para isolamento multi-usuário
    */
-  async representar(docRaw) {
+  async representar(docRaw, sessionId = null) {
     const cleanDoc = (docRaw || '').replace(/\D/g, '');
 
     if (cleanDoc.length !== 14 && cleanDoc.length !== 11) {
@@ -445,10 +446,12 @@ class RepresentationService {
     const updatedRecents = filtered.slice(0, 10);
     this._writeRecent(updatedRecents);
 
-    // 4. Salva nas configurações como empresa representada ativa
-    storageService.updateSettings({
-      activeRepresentedCnpj: cleanDoc
-    });
+    // 4. Salva nas configurações apenas se for uso global sem sessão (ex: testes ou scripts CLI)
+    if (!sessionId) {
+      storageService.updateSettings({
+        activeRepresentedCnpj: cleanDoc
+      });
+    }
 
     // 5. Salva também no storage de empresas com dados enriquecidos
     storageService.saveCompany(companyData);
@@ -592,10 +595,14 @@ class RepresentationService {
 
   /**
    * Retorna os dados da empresa atualmente representada
+   * @param {string|null} docRaw - Se informado, busca os dados deste CNPJ específico (isolamento de sessão)
    */
-  getActiveRepresentation() {
-    const settings = storageService.getSettings();
-    const activeCnpj = (settings.activeRepresentedCnpj || '').replace(/\D/g, '');
+  getActiveRepresentation(docRaw = null) {
+    let activeCnpj = (docRaw || '').replace(/\D/g, '');
+    if (!activeCnpj) {
+      const settings = storageService.getSettings();
+      activeCnpj = (settings.activeRepresentedCnpj || '').replace(/\D/g, '');
+    }
 
     if (!activeCnpj) return null;
 

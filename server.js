@@ -51,6 +51,35 @@ app.use(express.static(path.join(__dirname, 'public')));
 let currentEnvironment = storageService.getSettings().activeEnvironment || DEFAULT_ENVIRONMENT;
 
 // ==========================================
+// GERENCIADOR DE SESSÕES (MULTI-USUÁRIO / CONCORRÊNCIA)
+// ==========================================
+const sessionStore = new Map(); // sessionId -> { activeCnpj, lastSeen: Date }
+
+function resolveSessionCnpj(req) {
+  // 1. Prioridade máxima: cabeçalho explícito da empresa representada ativa do navegador
+  const headerCnpj = req.headers['x-represented-cnpj'];
+  if (headerCnpj) {
+    const clean = String(headerCnpj).replace(/\D/g, '');
+    if (clean) return clean;
+  }
+
+  // 2. Segunda prioridade: sessão em memória indexada por X-Session-ID
+  const sessionId = req.headers['x-session-id'] || req.query.sessionId;
+  if (sessionId && sessionStore.has(sessionId)) {
+    const sess = sessionStore.get(sessionId);
+    sess.lastSeen = Date.now();
+    return sess.activeCnpj;
+  }
+
+  // 3. Fallback: query param prestadorCnpj (se presente em consultas específicas)
+  if (req.query && req.query.prestadorCnpj) {
+    return String(req.query.prestadorCnpj).replace(/\D/g, '');
+  }
+
+  return null;
+}
+
+// ==========================================
 // ROTAS DE STATUS E AMBIENTES
 // ==========================================
 
@@ -59,7 +88,10 @@ app.get('/api/status', async (req, res) => {
   const envConfig = ENVIRONMENTS[currentEnvironment] || ENVIRONMENTS.HOMOLOGACAO;
   const certInfo = certService.getPublicCertInfo();
   const settings = storageService.getSettings();
-  const activeRepresentation = representationService.getActiveRepresentation();
+  const sessionCnpj = resolveSessionCnpj(req);
+  const activeRepresentation = sessionCnpj
+    ? representationService.getActiveRepresentation(sessionCnpj)
+    : null;
   const recentRepresentations = representationService.getRecentRepresentations();
 
   res.json({
@@ -165,7 +197,17 @@ app.post('/api/proxy/validate', (req, res) => {
 app.post('/api/representation/representar', async (req, res) => {
   try {
     const { doc } = req.body;
-    const result = await representationService.representar(doc);
+    const sessionId = req.headers['x-session-id'];
+    const result = await representationService.representar(doc, sessionId);
+    
+    if (sessionId && result && result.representedCompany) {
+      const cleanDoc = (result.representedCompany.cnpjRaw || doc).replace(/\D/g, '');
+      sessionStore.set(sessionId, {
+        activeCnpj: cleanDoc,
+        lastSeen: Date.now()
+      });
+    }
+
     res.json(result);
   } catch (err) {
     res.status(400).json({ success: false, error: translateError(err, { step: 'Representação por Procuração' }) });
@@ -184,16 +226,23 @@ app.get('/api/representation/recent', (req, res) => {
   res.json(recents);
 });
 
-// Representação Ativa Atual
+// Representação Ativa Atual (Respeita a sessão isolada do navegador)
 app.get('/api/representation/active', (req, res) => {
-  const active = representationService.getActiveRepresentation();
+  const sessionCnpj = resolveSessionCnpj(req);
+  const active = representationService.getActiveRepresentation(sessionCnpj);
   res.json({ activeRepresentation: active });
 });
 
-// Limpa representação ativa
+// Limpa representação ativa para a sessão atual
 app.post('/api/representation/clear', (req, res) => {
-  representationService.clearActiveRepresentation();
-  res.json({ success: true, message: 'Representação encerrada. Emissão em modo titular direto.' });
+  const sessionId = req.headers['x-session-id'];
+  if (sessionId && sessionStore.has(sessionId)) {
+    sessionStore.delete(sessionId);
+  }
+  if (!sessionId) {
+    representationService.clearActiveRepresentation();
+  }
+  res.json({ success: true, message: 'Representação encerrada para esta sessão.' });
 });
 
 // ==========================================
@@ -734,7 +783,8 @@ app.post('/api/connectivity/test', async (req, res) => {
   const settings = storageService.getSettings();
   const envConfig = ENVIRONMENTS[currentEnvironment] || ENVIRONMENTS.HOMOLOGACAO;
   const certInfo = certService.getPublicCertInfo();
-  const activeRepresentation = representationService.getActiveRepresentation();
+  const sessionCnpj = resolveSessionCnpj(req);
+  const activeRepresentation = sessionCnpj ? representationService.getActiveRepresentation(sessionCnpj) : representationService.getActiveRepresentation();
 
   const [rfbStatus, serproStatus] = await Promise.all([
     adnService.testDirectRfbConnection(currentEnvironment),

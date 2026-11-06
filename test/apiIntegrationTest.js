@@ -85,6 +85,22 @@ async function runApiTests() {
     }).then(r => r.json());
     console.log('✓ /api/representation/representar:', repRes.success, 'Empresa:', repRes.representedCompany?.razaoSocial);
 
+    // 5.1 Teste de Concorrência Multi-Sessão (Dois operadores trabalhando ao mesmo tempo)
+    const statusA = await fetch(`${baseUrl}/api/status`, {
+      headers: { 'X-Session-ID': 'sess_user_alpha', 'X-Represented-CNPJ': '48593822000150' }
+    }).then(r => r.json());
+
+    const statusB = await fetch(`${baseUrl}/api/status`, {
+      headers: { 'X-Session-ID': 'sess_user_beta', 'X-Represented-CNPJ': '39853166000196' }
+    }).then(r => r.json());
+
+    const matchA = statusA.activeRepresentation?.cnpjRaw === '48593822000150';
+    const matchB = statusB.activeRepresentation?.cnpjRaw === '39853166000196';
+    if (!matchA || !matchB) {
+      throw new Error(`Falha no isolamento multi-usuário: Sessão A=${statusA.activeRepresentation?.cnpjRaw}, Sessão B=${statusB.activeRepresentation?.cnpjRaw}`);
+    }
+    console.log('✓ [MULTI-USUÁRIO] Isolamento Concorrente entre Sessões A e B: 100% ISOLADAS E INDEPENDENTES');
+
     // 6. Lista de Representações Recentes
     const recentsRes = await fetch(`${baseUrl}/api/representation/recent`).then(r => r.json());
     console.log('✓ /api/representation/recent: Total de recentes:', recentsRes.length);
