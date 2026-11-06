@@ -51,7 +51,9 @@ class RepresentationService {
     try {
       if (!fs.existsSync(RECENT_FILE)) return [];
       const data = fs.readFileSync(RECENT_FILE, 'utf8');
-      return JSON.parse(data);
+      const list = JSON.parse(data);
+      const blocklist = storageService.VENDOR_BLOCKLIST || new Set();
+      return Array.isArray(list) ? list.filter(r => r && r.cnpjRaw && !blocklist.has(r.cnpjRaw)) : [];
     } catch {
       return [];
     }
