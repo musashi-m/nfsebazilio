@@ -3632,7 +3632,7 @@ const App = {
     const rpsDataFim = document.getElementById('fltRpsDataFim')?.value || '';
     const situacaoDebito = document.getElementById('fltSituacaoDebito')?.value || '';
     const chaveAcesso = (document.getElementById('fltChaveAcesso')?.value || '').trim().replace(/\D/g, '');
-    const papelFiltro = document.getElementById('selectFiltroPapel')?.value || 'EMITIDAS';
+    const papelFiltro = document.getElementById('selectFiltroPapel')?.value || 'TODAS';
 
     let notes = this.state.history || [];
 
@@ -5642,7 +5642,7 @@ const App = {
     // Tabela de Últimas NFS-e
     const recentTarget = document.getElementById('dashRecentTableBody');
     if (recentTarget) {
-      const papelFilter = this.state.dashPapelFilter || 'EMITIDAS';
+      const papelFilter = this.state.dashPapelFilter || 'TODAS';
       let tableNotes = notes;
       if (papelFilter === 'EMITIDAS') {
         tableNotes = prestadas;
