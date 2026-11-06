@@ -113,7 +113,7 @@ class DanfseViewer {
     }
 
     try {
-      const data = this.extractDanfseData(targetNfse);
+      const data = this.extractData(targetNfse);
       const cleanNum = String(data.numNfse || targetNfse.numeroNfse || '').replace(/\D/g, '');
       const cleanChave = String(data.chave || targetNfse.chaveAcesso || '').replace(/\D/g, '');
       const filename = cleanNum ? `DANFSE_${cleanNum}.pdf` : `DANFSE_${cleanChave ? cleanChave.substring(0, 15) : 'NACIONAL'}.pdf`;
@@ -161,9 +161,19 @@ class DanfseViewer {
       };
 
       if (typeof html2pdf !== 'undefined') {
-        await html2pdf().set(opt).from(docEl).save();
+        const pdfBlob = await html2pdf().set(opt).from(docEl).output('blob');
+        const blobUrl = URL.createObjectURL(pdfBlob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(blobUrl);
+        }, 1500);
       } else {
-        window.print();
+        alert('A ferramenta de download de PDF está sendo carregada pelo navegador. Aguarde alguns instantes e clique novamente.');
       }
 
       // Restaura estilos originais
@@ -172,7 +182,7 @@ class DanfseViewer {
 
     } catch (err) {
       console.error('Erro ao gerar download do PDF:', err);
-      window.print();
+      alert('Ocorreu um erro ao gerar o arquivo PDF: ' + err.message);
     } finally {
       if (btn) {
         btn.disabled = false;
