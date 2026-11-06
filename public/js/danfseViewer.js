@@ -575,8 +575,8 @@ class DanfseViewer {
   // ========================================================
   // RENDERIZAÇÃO DO DOCUMENTO OFICIAL (PADRÃO NACIONAL RFB)
   // ========================================================
-  renderDanfse(nfse) {
-    const target = document.getElementById('danfseRenderTarget');
+  renderDanfse(nfse, targetElement = null) {
+    const target = targetElement || document.getElementById('danfseRenderTarget');
     if (!target) return;
 
     const data = this.extractData(nfse);

@@ -15,7 +15,7 @@
   <!-- JSZip CDN para download de pacotes XML -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="css/styles.css?v=2.7">
+  <link rel="stylesheet" href="css/styles.css?v=2.8">
   <script>
     // Inicialização imediata do tema para evitar clarões na tela (Flash of Unstyled Content)
     (function() {
@@ -1940,6 +1940,36 @@
             </div>
           </div>
 
+          <!-- PRÉ-VISUALIZAÇÃO DIRETA DA DANFSe OFICIAL (RASCUNHO EMBUTIDO) -->
+          <div class="space-y-3 pt-3 border-t border-slate-200/90">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold shrink-0">
+                  <i data-lucide="file-check-2" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <h4 class="text-xs font-bold uppercase tracking-wider text-slate-800">Pré-visualização da DANFSe Oficial (Layout Nacional RFB)</h4>
+                  <p class="text-[11px] text-slate-500">Documento auxiliar conforme sairá após autorização no Ambiente de Dados Nacional</p>
+                </div>
+              </div>
+              <div class="flex items-center space-x-2 self-start sm:self-auto">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                  MARCA D'ÁGUA: RASCUNHO
+                </span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                  CGNFS-e v2.0
+                </span>
+              </div>
+            </div>
+
+            <!-- Recipiente com fundo e margem para o documento A4 -->
+            <div class="bg-slate-100/90 dark:bg-slate-900/50 p-3 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 flex justify-center overflow-x-auto shadow-inner">
+              <div id="danfseStep4PreviewTarget" class="w-full max-w-[820px] bg-white rounded shadow-sm">
+                <!-- DANFSe gerada em tempo real -->
+              </div>
+            </div>
+          </div>
+
           <!-- Rodapé Ação Final Etapa 4 -->
           <div class="pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
             <button type="button" onclick="App.goToEmissionStep(3)" class="w-full sm:w-auto px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition-all flex items-center justify-center space-x-2 border border-slate-300 active:scale-95">
@@ -1947,10 +1977,6 @@
               <span>Voltar: Valores</span>
             </button>
             <div class="flex items-center space-x-3 w-full sm:w-auto">
-              <button type="button" onclick="App.visualizarPreviaDanfse()" class="flex-1 sm:flex-initial px-4 py-3 bg-brand-50 hover:bg-brand-100 text-brand-700 font-semibold text-xs rounded-xl transition-colors flex items-center justify-center space-x-1.5 border border-brand-200 active:scale-95">
-                <i data-lucide="eye" class="w-4 h-4 text-brand-600"></i>
-                <span>Prévia da DANFSe</span>
-              </button>
               <button type="button" onclick="App.previewXmlDps()" class="flex-1 sm:flex-initial px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition-colors flex items-center justify-center space-x-1.5 border border-slate-300 active:scale-95">
                 <i data-lucide="file-code" class="w-4 h-4 text-slate-600"></i>
                 <span>Pré-visualizar XML</span>
@@ -2900,10 +2926,10 @@
   </div>
 
   <!-- Scripts da Aplicação -->
-  <script src="js/municipios.js?v=2.7"></script>
-  <script src="js/errorModal.js?v=2.7"></script>
-  <script src="js/html2pdf.bundle.min.js?v=2.7"></script>
-  <script src="js/danfseViewer.js?v=2.7"></script>
-  <script src="js/app.js?v=2.7"></script>
+  <script src="js/municipios.js?v=2.8"></script>
+  <script src="js/errorModal.js?v=2.8"></script>
+  <script src="js/html2pdf.bundle.min.js?v=2.8"></script>
+  <script src="js/danfseViewer.js?v=2.8"></script>
+  <script src="js/app.js?v=2.8"></script>
 </body>
 </html>

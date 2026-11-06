@@ -1856,6 +1856,7 @@ const App = {
       this.calculateEmissionTotals();
     } else if (step === 4) {
       this.renderRevisionSummary();
+      this.renderStep4DanfsePreview();
     }
 
     if (window.lucide) lucide.createIcons();
@@ -1948,6 +1949,93 @@ const App = {
       if (payload.issRetido) liq -= (payload.valorServico * (payload.aliquotaIss || 0)) / 100;
       liq -= ((payload.retIr || 0) + (payload.retContrSociais || 0) + (payload.retInss || 0));
       elValLiq.innerText = fmtBrl(liq);
+    }
+  },
+
+  getPreviaNfseObject() {
+    const payload = this.getEmissionPayload();
+    const prestador = this.state.empresaAtiva || {};
+
+    return {
+      isRascunho: true,
+      numeroNfse: 'PRÉVIA',
+      chaveAcesso: '99999999999999999999999999999999999999999999',
+      dataEmissao: new Date().toISOString(),
+      dataAutorizacao: new Date().toISOString(),
+      status: 'RASCUNHO',
+      prestador: {
+        cnpj: payload.prestadorCnpj || prestador.cnpj || '',
+        razaoSocial: payload.prestadorRazaoSocial || prestador.razaoSocial || 'EMPRESA EMITENTE',
+        im: payload.prestadorIm || prestador.im || '-',
+        telefone: prestador.telefone || '(79) 3221-5331',
+        uf: prestador.uf || 'SE',
+        municipio: prestador.municipio || 'Aracaju',
+        cep: payload.prestadorCep || prestador.cep || '49050-710',
+        endereco: `${payload.prestadorLogradouro || prestador.logradouro || ''}, ${payload.prestadorNumero || prestador.numero || 'S/N'}, ${payload.prestadorBairro || prestador.bairro || ''}`,
+        email: prestador.email || 'contato@empresa.com.br',
+        opSimpNac: payload.opSimpNac || 3,
+        regApTribSN: payload.regApTribSN || 1
+      },
+      tomador: {
+        tipoDoc: payload.tomadorTipoDoc,
+        documento: payload.tomadorDoc || '00000000000',
+        razaoSocial: payload.tomadorNome || 'TOMADOR / ADQUIRENTE',
+        im: payload.tomadorIm || '-',
+        telefone: payload.tomadorTelefone || '',
+        email: payload.tomadorEmail || '',
+        cep: payload.tomadorCep || '',
+        logradouro: payload.tomadorLogradouro || '',
+        numero: payload.tomadorNumero || '',
+        bairro: payload.tomadorBairro || '',
+        municipio: payload.tomadorMunicipio || '',
+        uf: payload.tomadorUf || 'SE',
+        municipioIbge: payload.tomadorMunIbge || '2800308'
+      },
+      servico: {
+        cTribNac: payload.cTribNac || '171901',
+        xDescServ: payload.descricaoServico || 'PRESTAÇÃO DE SERVIÇOS',
+        itemNbs: payload.itemNbs || '',
+        localPrestacaoIbge: payload.localPrestacaoIbge || '2800308',
+        paisPrestacao: payload.paisPrestacao || '1058'
+      },
+      valores: {
+        vServ: payload.valorServico || 0,
+        vDescIncond: payload.descontoIncondicionado || 0,
+        vDescCond: payload.descontoCondicionado || 0,
+        vDed: payload.valorDeducoes || 0,
+        issRetido: payload.issRetido,
+        tpRetIssqn: payload.tipoRetencaoIss,
+        pAliq: payload.aliquotaIss,
+        tribIssqn: payload.tribIssqn,
+        vPis: payload.retPis || 0,
+        vCofins: payload.retCofins || 0,
+        vInss: payload.retInss || 0,
+        vIr: payload.retIr || 0,
+        vCsll: payload.retCsll || 0,
+        modoValorAproxTrib: payload.modoValorAproxTrib,
+        pTotTribSN: payload.pTotTribSN,
+        aliquotaSimplesNacional: payload.aliquotaSimplesNacional,
+        valTribFed: payload.valTribFed,
+        valTribEst: payload.valTribEst,
+        valTribMun: payload.valTribMun,
+        aliqTribFed: payload.aliqTribFed,
+        aliqTribEst: payload.aliqTribEst,
+        aliqTribMun: payload.aliqTribMun
+      },
+      informacoesComplementares: payload.informacoesComplementares || ''
+    };
+  },
+
+  renderStep4DanfsePreview() {
+    const target = document.getElementById('danfseStep4PreviewTarget');
+    if (!target) return;
+    try {
+      const previa = this.getPreviaNfseObject();
+      if (window.danfseViewer) {
+        window.danfseViewer.renderDanfse(previa, target);
+      }
+    } catch (e) {
+      console.warn('Erro ao renderizar prévia da DANFSe na etapa 4:', e);
     }
   },
 
@@ -4812,80 +4900,9 @@ const App = {
 
   visualizarPreviaDanfse() {
     try {
-      const payload = this.getEmissionPayload();
-      const prestador = this.state.empresaAtiva || {};
-
-      const previaNfse = {
-        isRascunho: true,
-        numeroNfse: 'PRÉVIA',
-        chaveAcesso: '99999999999999999999999999999999999999999999',
-        dataEmissao: new Date().toISOString(),
-        dataAutorizacao: new Date().toISOString(),
-        status: 'RASCUNHO',
-        prestador: {
-          cnpj: payload.prestadorCnpj || prestador.cnpj || '',
-          razaoSocial: payload.prestadorRazaoSocial || prestador.razaoSocial || 'EMPRESA EMITENTE',
-          im: payload.prestadorIm || prestador.im || '-',
-          telefone: prestador.telefone || '(79) 3221-5331',
-          uf: prestador.uf || 'SE',
-          municipio: prestador.municipio || 'Aracaju',
-          cep: payload.prestadorCep || prestador.cep || '49050-710',
-          endereco: `${payload.prestadorLogradouro || prestador.logradouro || ''}, ${payload.prestadorNumero || prestador.numero || 'S/N'}, ${payload.prestadorBairro || prestador.bairro || ''}`,
-          email: prestador.email || 'contato@empresa.com.br',
-          opSimpNac: payload.opSimpNac || 3,
-          regApTribSN: payload.regApTribSN || 1
-        },
-        tomador: {
-          tipoDoc: payload.tomadorTipoDoc,
-          documento: payload.tomadorDoc || '00000000000',
-          razaoSocial: payload.tomadorNome || 'TOMADOR / ADQUIRENTE',
-          im: payload.tomadorIm || '-',
-          telefone: payload.tomadorTelefone || '',
-          email: payload.tomadorEmail || '',
-          cep: payload.tomadorCep || '',
-          logradouro: payload.tomadorLogradouro || '',
-          numero: payload.tomadorNumero || '',
-          bairro: payload.tomadorBairro || '',
-          municipio: payload.tomadorMunicipio || '',
-          uf: payload.tomadorUf || 'SE',
-          municipioIbge: payload.tomadorMunIbge || '2800308'
-        },
-        servico: {
-          cTribNac: payload.cTribNac || '171901',
-          xDescServ: payload.descricaoServico || 'PRESTAÇÃO DE SERVIÇOS',
-          itemNbs: payload.itemNbs || '',
-          localPrestacaoIbge: payload.localPrestacaoIbge || '2800308',
-          paisPrestacao: payload.paisPrestacao || '1058'
-        },
-        valores: {
-          vServ: payload.valorServico || 0,
-          vDescIncond: payload.descontoIncondicionado || 0,
-          vDescCond: payload.descontoCondicionado || 0,
-          vDed: payload.valorDeducoes || 0,
-          issRetido: payload.issRetido,
-          tpRetIssqn: payload.tipoRetencaoIss,
-          pAliq: payload.aliquotaIss,
-          tribIssqn: payload.tribIssqn,
-          vPis: payload.retPis || 0,
-          vCofins: payload.retCofins || 0,
-          vInss: payload.retInss || 0,
-          vIr: payload.retIr || 0,
-          vCsll: payload.retCsll || 0,
-          modoValorAproxTrib: payload.modoValorAproxTrib,
-          pTotTribSN: payload.pTotTribSN,
-          aliquotaSimplesNacional: payload.aliquotaSimplesNacional,
-          valTribFed: payload.valTribFed,
-          valTribEst: payload.valTribEst,
-          valTribMun: payload.valTribMun,
-          aliqTribFed: payload.aliqTribFed,
-          aliqTribEst: payload.aliqTribEst,
-          aliqTribMun: payload.aliqTribMun
-        },
-        informacoesComplementares: payload.informacoesComplementares || ''
-      };
-
+      const previa = this.getPreviaNfseObject();
       if (window.danfseViewer) {
-        window.danfseViewer.show(previaNfse);
+        window.danfseViewer.show(previa);
       } else {
         alert('Visualizador de DANFSe não carregado.');
       }
