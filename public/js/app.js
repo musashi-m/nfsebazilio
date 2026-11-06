@@ -185,7 +185,8 @@ const App = {
     // Formulário de emissão: Cálculos dinâmicos de impostos e retenções
     [
       'fValorServico', 'fValorIntermediario', 'fDescontoIncondicionado', 'fDescontoCondicionado',
-      'fAliquotaIss', 'fRetIr', 'fRetContrSociais', 'fRetInss', 'fAliquotaSimplesNacional'
+      'fAliquotaIss', 'fAliquotaRetencao', 'fRetIr', 'fRetContrSociais', 'fRetInss', 'fAliquotaSimplesNacional',
+      'fValTribFed', 'fValTribEst', 'fValTribMun', 'fAliqTribFed', 'fAliqTribEst', 'fAliqTribMun'
     ].forEach(id => {
       const el = document.getElementById(id);
       if (el) {
@@ -193,6 +194,27 @@ const App = {
         el.addEventListener('change', () => this.calculateEmissionTotals());
       }
     });
+
+    // Auto-save e validação visual reativa em tempo real no formulário
+    const emissionForm = document.getElementById('emissionFormView');
+    if (emissionForm) {
+      emissionForm.addEventListener('input', (e) => {
+        this.triggerDebouncedAutoSave();
+        const target = e.target;
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) {
+          if (target.classList.contains('border-rose-500') || target.classList.contains('border-emerald-500') || (target.value && target.value.trim().length > 0)) {
+            this.validateField(target);
+          }
+        }
+      });
+      emissionForm.addEventListener('change', (e) => {
+        this.triggerDebouncedAutoSave();
+        const target = e.target;
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) {
+          this.validateField(target);
+        }
+      });
+    }
 
     // Data de competência padrão: Hoje e sincronização com exibição
     const compInput = document.getElementById('fDataCompetencia');
@@ -690,16 +712,22 @@ const App = {
     if (window.lucide) lucide.createIcons();
   },
 
-  iniciarEmissaoDoZero() {
+  iniciarEmissaoDoZero(forceFresh = false) {
     this.clearEmissionForm();
     if (this.state.activeRepresentation) {
       this.fillEmissionFormWithRepresentation(this.state.activeRepresentation);
     }
+    const hasRestored = !forceFresh && this.restoreEmissionDraft();
     this.showEmissionFormView({
-      mode: 'ZERO',
-      badgeText: 'Emitindo do Zero',
-      subtitle: 'Formulário limpo para preenchimento manual completo de todas as seções.'
+      mode: hasRestored ? 'RASCUNHO' : 'ZERO',
+      badgeText: hasRestored ? 'Rascunho Restaurado' : 'Emitindo do Zero',
+      subtitle: hasRestored 
+        ? 'Restauramos o último rascunho em andamento desta empresa automaticamente.' 
+        : 'Formulário limpo para preenchimento manual completo de todas as seções.'
     });
+    if (hasRestored) {
+      this.showToast('Rascunho recuperado automaticamente!', 'info');
+    }
   },
 
   clearEmissionForm() {
@@ -711,6 +739,14 @@ const App = {
       const radio = document.querySelector(`input[name="${name}"][value="${val}"]`);
       if (radio) radio.checked = true;
     };
+
+    // Remove classes visuais de validação anteriores
+    const formEl = document.getElementById('emissionFormView');
+    if (formEl) {
+      formEl.querySelectorAll('.border-emerald-500, .border-rose-500').forEach(el => {
+        el.classList.remove('border-emerald-500', 'border-rose-500', 'ring-1', 'ring-emerald-500/20', 'ring-rose-500/20');
+      });
+    }
 
     // Tomador
     setVal('fTomadorDoc', '');
@@ -763,6 +799,17 @@ const App = {
     setVal('fRetCsll', '');
     setVal('fRetIrrf', '');
     setVal('fRetCp', '');
+
+    // Tributos Aproximados
+    setVal('fValTribFed', '0.00');
+    setVal('fValTribEst', '0.00');
+    setVal('fValTribMun', '0.00');
+    setVal('fAliqTribFed', '13.45');
+    setVal('fAliqTribEst', '0.00');
+    setVal('fAliqTribMun', '2.00');
+    setVal('fAliquotaSimplesNacional', '15.50');
+    setRadio('fModoValorAproxTrib', 'simples');
+    this.handleModoTribAproxChange('simples');
 
     // Intermediário
     this.limparIntermediario();
@@ -1505,46 +1552,277 @@ const App = {
     }
   },
 
+  // --- VALIDAÇÃO VISUAL ANTECIPADA (BORDAS VERDES / VERMELHAS) ---
+  setFieldValidationState(el, isValid, isTouched = true) {
+    if (!el) return;
+    el.classList.remove('border-rose-500', 'ring-1', 'ring-rose-500/20', 'border-emerald-500', 'ring-emerald-500/20');
+    if (!isTouched && (!el.value || !el.value.trim())) {
+      return;
+    }
+    if (isValid) {
+      el.classList.add('border-emerald-500', 'ring-1', 'ring-emerald-500/20');
+    } else {
+      el.classList.add('border-rose-500', 'ring-1', 'ring-rose-500/20');
+    }
+  },
+
+  validateField(idOrEl) {
+    const el = typeof idOrEl === 'string' ? document.getElementById(idOrEl) : idOrEl;
+    if (!el || !el.id) return true;
+
+    const val = (el.value || '').trim();
+    const loc = document.querySelector('input[name="fTomadorLocalizacao"]:checked')?.value || 'brasil';
+    const chkEnd = document.getElementById('chkInformarEnderecoTomador')?.checked !== false;
+
+    let valid = true;
+    switch (el.id) {
+      case 'fTomadorDoc': {
+        const raw = val.replace(/\D/g, '');
+        if (loc === 'exterior') valid = val.length >= 3;
+        else if (loc === 'nao_informado') valid = true;
+        else valid = raw.length === 11 || raw.length === 14;
+        break;
+      }
+      case 'fTomadorNome': {
+        if (loc === 'nao_informado') valid = true;
+        else valid = val.length >= 3;
+        break;
+      }
+      case 'fTomadorCep': {
+        if (loc === 'brasil' && chkEnd) valid = val.replace(/\D/g, '').length === 8;
+        else valid = true;
+        break;
+      }
+      case 'fTomadorLogradouro':
+      case 'fTomadorNumero':
+      case 'fTomadorBairro':
+      case 'fTomadorMunicipio': {
+        if (loc === 'brasil' && chkEnd) valid = val.length > 0;
+        else valid = true;
+        break;
+      }
+      case 'fTomadorUf': {
+        if (loc === 'brasil' && chkEnd) valid = val.length === 2;
+        else valid = true;
+        break;
+      }
+      case 'fCTribNac': {
+        valid = val.replace(/\D/g, '').length >= 6;
+        break;
+      }
+      case 'fLocalPrestacaoIbge': {
+        valid = val.replace(/\D/g, '').length === 7;
+        break;
+      }
+      case 'fDescricaoServico': {
+        valid = val.length >= 5;
+        break;
+      }
+      case 'fValorServico': {
+        const num = parseFloat(val);
+        valid = !isNaN(num) && num > 0;
+        break;
+      }
+      case 'fAliquotaRetencao': {
+        const retSim = document.querySelector('input[name="fRetencaoIssqnRadio"]:checked')?.value === 'sim';
+        if (retSim) {
+          const num = parseFloat(val);
+          valid = !isNaN(num) && num > 0 && num <= 100;
+        } else {
+          valid = true;
+        }
+        break;
+      }
+      case 'fAliquotaSimplesNacional': {
+        const num = parseFloat(val);
+        valid = !isNaN(num) && num >= 0 && num <= 100;
+        break;
+      }
+      case 'fValTribFed':
+      case 'fValTribEst':
+      case 'fValTribMun': {
+        const num = parseFloat(val);
+        valid = !isNaN(num) && num >= 0;
+        break;
+      }
+      case 'fAliqTribFed':
+      case 'fAliqTribEst':
+      case 'fAliqTribMun': {
+        const num = parseFloat(val);
+        valid = !isNaN(num) && num >= 0 && num <= 100;
+        break;
+      }
+      default:
+        valid = true;
+    }
+
+    this.setFieldValidationState(el, valid, true);
+    return valid;
+  },
+
+  validateEmissionStep(step) {
+    let isValid = true;
+    let firstInvalid = null;
+
+    const check = (id) => {
+      const el = document.getElementById(id);
+      if (!el) return true;
+      const valid = this.validateField(el);
+      if (!valid) {
+        isValid = false;
+        if (!firstInvalid) firstInvalid = el;
+      }
+      return valid;
+    };
+
+    if (step === 1) {
+      const loc = document.querySelector('input[name="fTomadorLocalizacao"]:checked')?.value || 'brasil';
+      if (loc !== 'nao_informado') {
+        check('fTomadorDoc');
+        check('fTomadorNome');
+        const chkEnd = document.getElementById('chkInformarEnderecoTomador')?.checked !== false;
+        if (chkEnd && loc === 'brasil') {
+          check('fTomadorCep');
+          check('fTomadorLogradouro');
+          check('fTomadorNumero');
+          check('fTomadorBairro');
+          check('fTomadorMunicipio');
+          check('fTomadorUf');
+        }
+      }
+    } else if (step === 2) {
+      check('fCTribNac');
+      check('fLocalPrestacaoIbge');
+      check('fDescricaoServico');
+    } else if (step === 3) {
+      check('fValorServico');
+      const retencaoSim = document.querySelector('input[name="fRetencaoIssqnRadio"]:checked')?.value === 'sim';
+      if (retencaoSim) {
+        check('fAliquotaRetencao');
+      }
+      const modoTrib = document.querySelector('input[name="fModoValorAproxTrib"]:checked')?.value || 'simples';
+      if (modoTrib === 'simples') {
+        check('fAliquotaSimplesNacional');
+      } else if (modoTrib === 'monetario') {
+        check('fValTribFed');
+        check('fValTribEst');
+        check('fValTribMun');
+      } else if (modoTrib === 'percentual') {
+        check('fAliqTribFed');
+        check('fAliqTribEst');
+        check('fAliqTribMun');
+      }
+    }
+
+    if (!isValid && firstInvalid) {
+      firstInvalid.focus();
+      firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      this.showToast('Por favor, preencha ou corrija os campos destacados em vermelho antes de avançar.', 'error');
+    }
+
+    return isValid;
+  },
+
+  // --- AUTO-SAVE DO RASCUNHO (LOCALSTORAGE ISOLADO POR EMPRESA) ---
+  saveEmissionDraft() {
+    try {
+      const cnpj = this.state.empresaAtiva?.cnpj || this.state.activeRepresentation?.cnpj || 'default';
+      const formEl = document.getElementById('emissionFormView');
+      if (!formEl || !this.state.emissionInForm) return;
+
+      const draft = {};
+      const inputs = formEl.querySelectorAll('input, select, textarea');
+      inputs.forEach(input => {
+        if (!input.name && !input.id) return;
+        const key = input.id || input.name;
+        if (input.type === 'radio') {
+          if (input.checked) draft[input.name] = input.value;
+        } else if (input.type === 'checkbox') {
+          draft[key] = input.checked;
+        } else {
+          draft[key] = input.value;
+        }
+      });
+      draft._timestamp = Date.now();
+      localStorage.setItem(`nfse_draft_${cnpj}`, JSON.stringify(draft));
+    } catch (e) {
+      console.warn('Erro ao salvar rascunho de emissão:', e);
+    }
+  },
+
+  triggerDebouncedAutoSave() {
+    if (this._draftSaveTimer) clearTimeout(this._draftSaveTimer);
+    this._draftSaveTimer = setTimeout(() => {
+      this.saveEmissionDraft();
+    }, 600);
+  },
+
+  restoreEmissionDraft(cnpjParam) {
+    try {
+      const cnpj = cnpjParam || this.state.empresaAtiva?.cnpj || this.state.activeRepresentation?.cnpj || 'default';
+      const raw = localStorage.getItem(`nfse_draft_${cnpj}`);
+      if (!raw) return false;
+      const draft = JSON.parse(raw);
+      if (!draft || typeof draft !== 'object') return false;
+
+      // Restaura somente se tiver dados essenciais
+      if (!draft.fTomadorDoc && !draft.fDescricaoServico && !draft.fValorServico) {
+        return false;
+      }
+
+      Object.entries(draft).forEach(([key, val]) => {
+        if (key.startsWith('_')) return;
+        const radio = document.querySelector(`input[name="${key}"][value="${val}"]`);
+        if (radio) {
+          radio.checked = true;
+          return;
+        }
+        const el = document.getElementById(key) || document.querySelector(`[name="${key}"]`);
+        if (el) {
+          if (el.type === 'checkbox') {
+            el.checked = Boolean(val);
+          } else {
+            el.value = val;
+          }
+        }
+      });
+
+      const retencaoRadio = document.querySelector('input[name="fRetencaoIssqnRadio"]:checked')?.value || 'nao';
+      this.handleRetencaoIssqnChange(retencaoRadio);
+
+      const modoTrib = document.querySelector('input[name="fModoValorAproxTrib"]:checked')?.value || 'simples';
+      this.handleModoTribAproxChange(modoTrib);
+
+      this.calculateEmissionTotals();
+      return true;
+    } catch (e) {
+      console.warn('Erro ao restaurar rascunho:', e);
+      return false;
+    }
+  },
+
+  clearEmissionDraft(cnpjParam) {
+    try {
+      const cnpj = cnpjParam || this.state.empresaAtiva?.cnpj || this.state.activeRepresentation?.cnpj || 'default';
+      localStorage.removeItem(`nfse_draft_${cnpj}`);
+    } catch (e) {
+      console.warn('Erro ao limpar rascunho:', e);
+    }
+  },
+
   // --- ETAPAS DA EMISSÃO (WIZARD / STEPPER) ---
   goToEmissionStep(step) {
     if (step < 1) step = 1;
     if (step > 4) step = 4;
 
-    // Se estiver avançando da Etapa 1 para a 2, valida dados essenciais
-    if (step === 2 && this.state.currentEmissionStep === 1) {
-      const tomadorDoc = (document.getElementById('fTomadorDoc')?.value || '').replace(/\D/g, '');
-      const loc = document.querySelector('input[name="fTomadorLocalizacao"]:checked')?.value || 'brasil';
-      if (loc !== 'nao_informado') {
-        if (!tomadorDoc) {
-          alert('Por favor, informe o CPF ou CNPJ do Tomador antes de avançar para a etapa de Serviço.');
-          document.getElementById('fTomadorDoc')?.focus();
+    const current = this.state.currentEmissionStep || 1;
+
+    // Se estiver avançando (step > current), valida a etapa atual e etapas intermediárias
+    if (step > current) {
+      for (let s = current; s < step; s++) {
+        if (!this.validateEmissionStep(s)) {
           return;
         }
-        if (loc === 'brasil' && tomadorDoc.length !== 11 && tomadorDoc.length !== 14) {
-          alert(`O documento do tomador deve conter 11 dígitos (CPF) ou 14 dígitos (CNPJ). Foram informados ${tomadorDoc.length} dígitos.`);
-          document.getElementById('fTomadorDoc')?.focus();
-          return;
-        }
-      }
-    }
-
-    // Se estiver avançando da Etapa 2 para a 3, valida serviço
-    if (step === 3 && this.state.currentEmissionStep === 2) {
-      const desc = (document.getElementById('fDescricaoServico')?.value || '').trim();
-      if (!desc) {
-        alert('Por favor, preencha a Descrição do Serviço antes de avançar para a etapa de Valores.');
-        document.getElementById('fDescricaoServico')?.focus();
-        return;
-      }
-    }
-
-    // Se estiver avançando da Etapa 3 para a 4, valida valor
-    if (step === 4 && this.state.currentEmissionStep === 3) {
-      const val = parseFloat(document.getElementById('fValorServico')?.value || '0');
-      if (isNaN(val) || val <= 0) {
-        alert('Por favor, informe o Valor da Operação/Serviço prestado maior que zero.');
-        document.getElementById('fValorServico')?.focus();
-        return;
       }
     }
 
@@ -2089,10 +2367,22 @@ const App = {
 
     const toast = document.createElement('div');
     toast.id = 'appToastPill';
-    toast.className = `fixed top-5 right-5 z-50 flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-semibold shadow-xl border border-emerald-400 transition-all duration-300 transform ${
-      type === 'success' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-white'
-    }`;
-    toast.innerHTML = `<span class="text-sm">✓</span><span>${msg}</span>`;
+
+    let bgClasses = 'bg-emerald-600 text-white border-emerald-400';
+    let icon = '✓';
+    if (type === 'error') {
+      bgClasses = 'bg-rose-600 text-white border-rose-400 shadow-rose-900/20';
+      icon = '✕';
+    } else if (type === 'warning') {
+      bgClasses = 'bg-amber-600 text-white border-amber-400 shadow-amber-900/20';
+      icon = '⚠';
+    } else if (type === 'info') {
+      bgClasses = 'bg-slate-800 text-white border-slate-600';
+      icon = 'ℹ';
+    }
+
+    toast.className = `fixed top-5 right-5 z-50 flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-semibold shadow-xl border transition-all duration-300 transform ${bgClasses}`;
+    toast.innerHTML = `<span class="text-sm font-bold">${icon}</span><span>${msg}</span>`;
     document.body.appendChild(toast);
 
     setTimeout(() => {
@@ -3907,6 +4197,27 @@ const App = {
     const totalRetencoes = vIssRet + vIr + vContrSoc + vInss;
     const vLiquido = Math.max(0, Math.round((vServ - vDescIncond - totalRetencoes) * 100) / 100);
 
+    // Cálculo Tributos Aproximados (Lei 12.741/2012)
+    const modoTrib = document.querySelector('input[name="fModoValorAproxTrib"]:checked')?.value || 'simples';
+    let vTribAproxTotal = 0;
+    if (modoTrib === 'simples') {
+      const aliqSN = getNum('fAliquotaSimplesNacional') || 15.50;
+      vTribAproxTotal = Math.round((vServ * (aliqSN / 100)) * 100) / 100;
+    } else if (modoTrib === 'monetario') {
+      const fed = getNum('fValTribFed');
+      const est = getNum('fValTribEst');
+      const mun = getNum('fValTribMun');
+      vTribAproxTotal = Math.round((fed + est + mun) * 100) / 100;
+    } else if (modoTrib === 'percentual') {
+      const aliqFed = getNum('fAliqTribFed');
+      const aliqEst = getNum('fAliqTribEst');
+      const aliqMun = getNum('fAliqTribMun');
+      const fed = Math.round((vServ * (aliqFed / 100)) * 100) / 100;
+      const est = Math.round((vServ * (aliqEst / 100)) * 100) / 100;
+      const mun = Math.round((vServ * (aliqMun / 100)) * 100) / 100;
+      vTribAproxTotal = Math.round((fed + est + mun) * 100) / 100;
+    }
+
     const setTxt = (id, txt) => {
       const el = document.getElementById(id);
       if (el) el.innerText = txt;
@@ -3924,7 +4235,15 @@ const App = {
     setTxt('calcValorIss', retencaoSim ? fmt(vIss) : 'Simples Nacional');
     setTxt('calcValorIssRet', fmt(vIssRet));
     setTxt('calcTotalRetencoes', fmt(totalRetencoes));
+    setTxt('calcValorTribAprox', fmt(vTribAproxTotal));
     setTxt('calcValorLiquido', fmt(vLiquido));
+
+    // Atualiza revisão se visível
+    setTxt('revValorBruto', fmt(vServ));
+    setTxt('revIssRetido', retencaoSim ? `Sim (${fmt(vIssRet)})` : 'Não');
+    setTxt('revRetFederais', fmt(vIr + vContrSoc + vInss));
+    setTxt('revTribAprox', fmt(vTribAproxTotal));
+    setTxt('revValorLiquido', fmt(vLiquido));
   },
 
   checkTomadorObrigaRetencao(doc, nome) {
@@ -4197,11 +4516,15 @@ const App = {
   },
 
   handleModoTribAproxChange(modo) {
-    const box = document.getElementById('boxAliqSimplesNac');
-    if (box) {
-      if (modo === 'simples') box.classList.remove('hidden');
-      else box.classList.add('hidden');
-    }
+    const boxSimples = document.getElementById('boxAliqSimplesNac');
+    const boxMonetario = document.getElementById('boxTribMonetario');
+    const boxPercentual = document.getElementById('boxTribPercentual');
+
+    if (boxSimples) boxSimples.classList.toggle('hidden', modo !== 'simples');
+    if (boxMonetario) boxMonetario.classList.toggle('hidden', modo !== 'monetario');
+    if (boxPercentual) boxPercentual.classList.toggle('hidden', modo !== 'percentual');
+
+    this.calculateEmissionTotals();
   },
 
   getEmissionPayload() {
@@ -4333,7 +4656,13 @@ const App = {
       modoValorAproxTrib: document.querySelector('input[name="fModoValorAproxTrib"]:checked')?.value || 'simples',
       aliquotaSimplesNacional: getNum('fAliquotaSimplesNacional') || 15.50,
       pTotTribSN: getNum('fAliquotaSimplesNacional') || 15.50,
-      totTributosAprox: getNum('fAliquotaSimplesNacional') || 15.50
+      totTributosAprox: getNum('fAliquotaSimplesNacional') || 15.50,
+      valTribFed: getNum('fValTribFed'),
+      valTribEst: getNum('fValTribEst'),
+      valTribMun: getNum('fValTribMun'),
+      aliqTribFed: getNum('fAliqTribFed'),
+      aliqTribEst: getNum('fAliqTribEst'),
+      aliqTribMun: getNum('fAliqTribMun')
     };
   },
 
@@ -4479,6 +4808,91 @@ const App = {
     } catch (e2) {}
 
     alert('Não foi possível localizar o endereço para o CEP da obra informado.');
+  },
+
+  visualizarPreviaDanfse() {
+    try {
+      const payload = this.getEmissionPayload();
+      const prestador = this.state.empresaAtiva || {};
+
+      const previaNfse = {
+        isRascunho: true,
+        numeroNfse: 'PRÉVIA',
+        chaveAcesso: '99999999999999999999999999999999999999999999',
+        dataEmissao: new Date().toISOString(),
+        dataAutorizacao: new Date().toISOString(),
+        status: 'RASCUNHO',
+        prestador: {
+          cnpj: payload.prestadorCnpj || prestador.cnpj || '',
+          razaoSocial: payload.prestadorRazaoSocial || prestador.razaoSocial || 'EMPRESA EMITENTE',
+          im: payload.prestadorIm || prestador.im || '-',
+          telefone: prestador.telefone || '(79) 3221-5331',
+          uf: prestador.uf || 'SE',
+          municipio: prestador.municipio || 'Aracaju',
+          cep: payload.prestadorCep || prestador.cep || '49050-710',
+          endereco: `${payload.prestadorLogradouro || prestador.logradouro || ''}, ${payload.prestadorNumero || prestador.numero || 'S/N'}, ${payload.prestadorBairro || prestador.bairro || ''}`,
+          email: prestador.email || 'contato@empresa.com.br',
+          opSimpNac: payload.opSimpNac || 3,
+          regApTribSN: payload.regApTribSN || 1
+        },
+        tomador: {
+          tipoDoc: payload.tomadorTipoDoc,
+          documento: payload.tomadorDoc || '00000000000',
+          razaoSocial: payload.tomadorNome || 'TOMADOR / ADQUIRENTE',
+          im: payload.tomadorIm || '-',
+          telefone: payload.tomadorTelefone || '',
+          email: payload.tomadorEmail || '',
+          cep: payload.tomadorCep || '',
+          logradouro: payload.tomadorLogradouro || '',
+          numero: payload.tomadorNumero || '',
+          bairro: payload.tomadorBairro || '',
+          municipio: payload.tomadorMunicipio || '',
+          uf: payload.tomadorUf || 'SE',
+          municipioIbge: payload.tomadorMunIbge || '2800308'
+        },
+        servico: {
+          cTribNac: payload.cTribNac || '171901',
+          xDescServ: payload.descricaoServico || 'PRESTAÇÃO DE SERVIÇOS',
+          itemNbs: payload.itemNbs || '',
+          localPrestacaoIbge: payload.localPrestacaoIbge || '2800308',
+          paisPrestacao: payload.paisPrestacao || '1058'
+        },
+        valores: {
+          vServ: payload.valorServico || 0,
+          vDescIncond: payload.descontoIncondicionado || 0,
+          vDescCond: payload.descontoCondicionado || 0,
+          vDed: payload.valorDeducoes || 0,
+          issRetido: payload.issRetido,
+          tpRetIssqn: payload.tipoRetencaoIss,
+          pAliq: payload.aliquotaIss,
+          tribIssqn: payload.tribIssqn,
+          vPis: payload.retPis || 0,
+          vCofins: payload.retCofins || 0,
+          vInss: payload.retInss || 0,
+          vIr: payload.retIr || 0,
+          vCsll: payload.retCsll || 0,
+          modoValorAproxTrib: payload.modoValorAproxTrib,
+          pTotTribSN: payload.pTotTribSN,
+          aliquotaSimplesNacional: payload.aliquotaSimplesNacional,
+          valTribFed: payload.valTribFed,
+          valTribEst: payload.valTribEst,
+          valTribMun: payload.valTribMun,
+          aliqTribFed: payload.aliqTribFed,
+          aliqTribEst: payload.aliqTribEst,
+          aliqTribMun: payload.aliqTribMun
+        },
+        informacoesComplementares: payload.informacoesComplementares || ''
+      };
+
+      if (window.danfseViewer) {
+        window.danfseViewer.show(previaNfse);
+      } else {
+        alert('Visualizador de DANFSe não carregado.');
+      }
+    } catch (err) {
+      console.error('Erro ao abrir prévia da DANFSe:', err);
+      alert('Não foi possível gerar a prévia: ' + err.message);
+    }
   },
 
   async previewXmlDps() {

@@ -232,6 +232,11 @@ html.dark .danfse-page-container {
   z-index: 20;
 }
 
+.danfse-watermark-draft {
+  color: rgba(71, 85, 105, 0.20) !important;
+  border: 8px solid rgba(71, 85, 105, 0.20) !important;
+}
+
 /* ========================================================
    ESTILOS DE IMPRESSÃO - COBRE A PÁGINA A4 TODA (1 PÁGINA EXATA)
    ======================================================== */

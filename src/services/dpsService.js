@@ -70,6 +70,37 @@ class DpsService {
     const vOutrasRet = parseFloat(data.outrasRetencoes || 0);
     const pTotTribSN = parseFloat(data.aliquotaSimplesNacional || data.pTotTribSN || data.totTributosAprox || 15.50);
 
+    // Tributos Aproximados (Lei 12.741/2012)
+    const modoValorAproxTrib = data.modoValorAproxTrib || 'simples';
+    let xmlTotTrib = '';
+    if (modoValorAproxTrib === 'monetario') {
+      const vTotFed = parseFloat(data.valTribFed || 0);
+      const vTotEst = parseFloat(data.valTribEst || 0);
+      const vTotMun = parseFloat(data.valTribMun || 0);
+      xmlTotTrib = `        <totTrib>
+          <vTotTrib>
+            <vTotTribFed>${vTotFed.toFixed(2)}</vTotTribFed>
+            <vTotTribEst>${vTotEst.toFixed(2)}</vTotTribEst>
+            <vTotTribMun>${vTotMun.toFixed(2)}</vTotTribMun>
+          </vTotTrib>
+        </totTrib>`;
+    } else if (modoValorAproxTrib === 'percentual') {
+      const pTotFed = parseFloat(data.aliqTribFed || 0);
+      const pTotEst = parseFloat(data.aliqTribEst || 0);
+      const pTotMun = parseFloat(data.aliqTribMun || 0);
+      xmlTotTrib = `        <totTrib>
+          <pTotTrib>
+            <pTotTribFed>${pTotFed.toFixed(2)}</pTotTribFed>
+            <pTotTribEst>${pTotEst.toFixed(2)}</pTotTribEst>
+            <pTotTribMun>${pTotMun.toFixed(2)}</pTotTribMun>
+          </pTotTrib>
+        </totTrib>`;
+    } else {
+      xmlTotTrib = `        <totTrib>
+          <pTotTribSN>${pTotTribSN.toFixed(2)}</pTotTribSN>
+        </totTrib>`;
+    }
+
     const totalRetencoes = vIssRet + vPis + vCofins + vInss + vIr + vCsll + vOutrasRet;
     const vLiquido = Math.max(0, Math.round((vServ - vDescIncond - totalRetencoes) * 100) / 100);
 
@@ -287,9 +318,7 @@ ${xmlFinNfse}    <cLocEmi>${cLocEmi}</cLocEmi>
           <tribISSQN>${tribIssqn}</tribISSQN>${(pAliq > 0 && isTributavel && (opSimpNac == 1 || regApTribSN == 2 || issRetido)) ? `\n          <pAliq>${pAliq.toFixed(2)}</pAliq>` : ''}
           <tpRetISSQN>${tpRetIssqn}</tpRetISSQN>
         </tribMun>${xmlTribFed}
-        <totTrib>
-          <pTotTribSN>${pTotTribSN.toFixed(2)}</pTotTribSN>
-        </totTrib>
+${xmlTotTrib}
       </trib>
     </valores>
   </infDPS>
