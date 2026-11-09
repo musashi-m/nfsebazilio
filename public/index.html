@@ -2313,6 +2313,38 @@
           </div>
         </div>
 
+        <!-- BARRA DE PROGRESSO EM TEMPO REAL DA SINCRONIZAÇÃO ADN -->
+        <div id="syncProgressBarCard" class="hidden bg-gradient-to-r from-slate-900 via-slate-800 to-brand-950 rounded-2xl p-5 text-white shadow-md border border-brand-800/40 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2.5">
+              <div class="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
+                <i data-lucide="refresh-cw" class="w-4 h-4 animate-spin"></i>
+              </div>
+              <div>
+                <div class="flex items-center space-x-2">
+                  <span class="px-2 py-0.5 rounded bg-emerald-500 text-white font-extrabold text-[10px] uppercase tracking-wider">Sincronização ADN</span>
+                  <span id="syncProgressBatchTag" class="text-xs text-slate-300 font-mono">Iniciando...</span>
+                </div>
+                <p id="syncProgressStatusText" class="text-xs text-slate-200 mt-0.5 font-medium">Conectando ao canal mTLS da Receita Federal...</p>
+              </div>
+            </div>
+            <div class="text-right">
+              <span id="syncProgressPercent" class="text-2xl font-black font-mono text-emerald-400">0%</span>
+            </div>
+          </div>
+
+          <!-- Barra de Progresso Animada -->
+          <div class="w-full bg-slate-700/80 h-3 rounded-full overflow-hidden flex shadow-inner">
+            <div id="syncProgressBarFill" class="bg-gradient-to-r from-emerald-500 via-teal-400 to-brand-400 h-full transition-all duration-300 ease-out" style="width: 0%;"></div>
+          </div>
+
+          <!-- Detalhes no Rodapé da Barra -->
+          <div class="flex items-center justify-between text-[11px] text-slate-300 pt-0.5">
+            <span id="syncProgressDetails">Buscando documentos...</span>
+            <span id="syncProgressTimer" class="font-mono text-slate-400">Tempo decorrido: 0s</span>
+          </div>
+        </div>
+
         <!-- ======================================================== -->
         <!-- CARD 1: FILTROS DA PESQUISA -->
         <!-- ======================================================== -->
@@ -2618,6 +2650,51 @@
             <div id="paginationControls" class="flex items-center space-x-1">
               <!-- Renderizado dinamicamente -->
             </div>
+          </div>
+        </div>
+
+        <!-- CARD DO ROBÔ AGENDADO NOTURNO -->
+        <div class="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-4">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <div class="flex items-center space-x-3">
+              <div class="p-2.5 rounded-xl bg-purple-50 text-purple-700 border border-purple-100">
+                <i data-lucide="bot" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <div class="flex items-center space-x-2">
+                  <h3 class="text-sm font-bold text-slate-900">Robô de Sincronização Automática Noturna</h3>
+                  <span id="schedulerStatusBadge" class="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-800">ATIVO</span>
+                </div>
+                <p class="text-xs text-slate-500">Varredura automática e sincronização diária de madrugada de todas as empresas representadas.</p>
+              </div>
+            </div>
+
+            <div class="flex items-center space-x-2 shrink-0">
+              <button onclick="App.runSchedulerNow()" id="btnRunSchedulerNow" class="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center space-x-1.5">
+                <i data-lucide="play" class="w-3.5 h-3.5"></i>
+                <span>Executar Robô Agora</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/60">
+              <span class="text-[10px] text-slate-400 font-bold uppercase block">Horário Programado</span>
+              <span id="schedulerHourText" class="font-bold text-slate-800 text-sm font-mono">03:00 BRT (Diário)</span>
+            </div>
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/60">
+              <span class="text-[10px] text-slate-400 font-bold uppercase block">Última Execução</span>
+              <span id="schedulerLastRunText" class="font-bold text-slate-800 text-sm font-mono">-</span>
+            </div>
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/60">
+              <span class="text-[10px] text-slate-400 font-bold uppercase block">Próxima Execução</span>
+              <span id="schedulerNextRunText" class="font-bold text-slate-800 text-sm font-mono">-</span>
+            </div>
+          </div>
+
+          <!-- Log recente do robô -->
+          <div class="bg-slate-900 rounded-xl p-3 text-[11px] font-mono text-slate-300 max-h-32 overflow-y-auto space-y-1" id="schedulerLogsContainer">
+            <div class="text-slate-500 italic">Carregando logs do robô...</div>
           </div>
         </div>
       </section>

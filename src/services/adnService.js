@@ -19,17 +19,28 @@ const xmlParserService = require('./xmlParserService');
 const { translateError } = require('./errorTranslator');
 
 class AdnService {
+  constructor() {
+    this.activeSyncProgress = new Map();
+  }
+
+  getSyncProgress(cnpj) {
+    const clean = (cnpj || '').replace(/\D/g, '');
+    return this.activeSyncProgress.get(clean) || { inProgress: false, percent: 0, status: 'Inativo' };
+  }
+
   /**
    * Cria agente HTTPS mTLS com o certificado do Procurador para conexão direta com a RFB
    */
   createHttpsAgent(certData) {
     if (!certData || !certData.pfxBuffer) {
-      return new https.Agent({ rejectUnauthorized: true });
+      return new https.Agent({ rejectUnauthorized: true, keepAlive: true });
     }
 
     const baseTlsOptions = {
       rejectUnauthorized: false,
-      keepAlive: false,
+      keepAlive: true,
+      keepAliveMsecs: 15000,
+      maxSockets: 5,
       minVersion: 'TLSv1.2',
       maxVersion: 'TLSv1.2', // OBRIGATÓRIO: SERPRO / ADN tem bug documentado no TLS 1.3 que causa "bad record mac / decryption failed" no Linux
       ciphers: [
@@ -346,9 +357,36 @@ class AdnService {
 
     const httpsAgent = this.createHttpsAgent(certInfo);
 
+    this.activeSyncProgress.set(cleanCnpj, {
+      inProgress: true,
+      startTime: Date.now(),
+      batch: 0,
+      maxBatches,
+      currentNsu,
+      totalNovas: 0,
+      totalAtualizadas: 0,
+      totalEventos: 0,
+      percent: 5,
+      status: `Iniciando canal mTLS com o ADN da Receita Federal (NSU: ${currentNsu})...`
+    });
+
     try {
       while (batchCount < maxBatches) {
         batchCount++;
+        const progressPct = Math.min(95, Math.max(5, Math.round((batchCount / maxBatches) * 100)));
+        this.activeSyncProgress.set(cleanCnpj, {
+          inProgress: true,
+          startTime: Date.now(),
+          batch: batchCount,
+          maxBatches,
+          currentNsu,
+          totalNovas,
+          totalAtualizadas,
+          totalEventos,
+          percent: progressPct,
+          status: `Processando lote ${batchCount} de ~${maxBatches} (NSU ${currentNsu}) • ${totalNovas} novas notas...`
+        });
+
         const url = `${env.rfbAdnBaseUrl}/DFe/${currentNsu}?cnpjConsulta=${cleanCnpj}`;
 
         let response;
@@ -461,6 +499,18 @@ class AdnService {
         totalSincronizadas: (syncState.totalSincronizadas || 0) + totalNovas
       });
 
+      this.activeSyncProgress.set(cleanCnpj, {
+        inProgress: false,
+        batch: batchCount,
+        maxBatches,
+        currentNsu: finalUltNsu,
+        totalNovas,
+        totalAtualizadas,
+        totalEventos,
+        percent: 100,
+        status: `Sincronização concluída! ${totalNovas} nova(s) NFS-e e ${totalEventos} evento(s) baixados.`
+      });
+
       return {
         success: true,
         totalSincronizadas: totalNovas,
@@ -475,6 +525,12 @@ class AdnService {
         timestamp: new Date().toISOString()
       };
     } catch (err) {
+      this.activeSyncProgress.set(cleanCnpj, {
+        inProgress: false,
+        error: true,
+        percent: 100,
+        status: `Falha na sincronização: ${err.message}`
+      });
       if (err.response && (err.response.status === 404 || err.response.status === 204)) {
         const finalUltNsu = isReset ? currentNsu : Math.max(syncState.ultNSU || 0, currentNsu);
         return {

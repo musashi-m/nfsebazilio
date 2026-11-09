@@ -22,6 +22,7 @@ const storageService = require('./src/services/storageService');
 const xmlParserService = require('./src/services/xmlParserService');
 const representationService = require('./src/services/representationService');
 const fiscalService = require('./src/services/fiscalService');
+const schedulerService = require('./src/services/schedulerService');
 const { translateError, ERROR_DICTIONARY } = require('./src/services/errorTranslator');
 const {
   CODIGOS_TRIBUTACAO_NACIONAL,
@@ -785,6 +786,43 @@ app.get('/api/adn/sync-status', (req, res) => {
   const cnpj = req.query.cnpj;
   const state = storageService.getNsuState(cnpj);
   res.json({ success: true, state });
+});
+
+// Progresso em tempo real da sincronização ADN (para a barra de progresso)
+app.get('/api/adn/sync-progress', (req, res) => {
+  const sessionCnpj = resolveSessionCnpj(req);
+  const cnpj = req.query.cnpj || sessionCnpj;
+  const progress = adnService.getSyncProgress(cnpj);
+  res.json(progress);
+});
+
+// ==========================================
+// ROBÔ AGENDADO NOTURNO (SINCRONIZAÇÃO AUTOMÁTICA)
+// ==========================================
+
+// Status e histórico recente do robô
+app.get('/api/scheduler/status', (req, res) => {
+  res.json(schedulerService.getStatus());
+});
+
+// Disparo manual imediato da varredura de todas as empresas
+app.post('/api/scheduler/run-now', async (req, res) => {
+  try {
+    const result = await schedulerService.runNightlySync('MANUAL_VIA_PAINEL');
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Atualização de configuração do robô (horário e ativo/inativo)
+app.post('/api/scheduler/config', (req, res) => {
+  try {
+    const updated = schedulerService.updateConfig(req.body);
+    res.json({ success: true, config: updated });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
 });
 
 // Consulta NFS-e individual por Chave de Acesso diretamente no SEFIN Nacional / ADN

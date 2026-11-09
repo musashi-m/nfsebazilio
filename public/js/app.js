@@ -4457,6 +4457,7 @@ const App = {
       return;
     }
 
+    const cleanCnpj = cnpj.replace(/\D/g, '');
     const btn = startFromZero ? document.getElementById('btnSyncAdnAll') : document.getElementById('btnSyncAdn');
     let origHtml = '';
     if (btn) {
@@ -4464,6 +4465,61 @@ const App = {
       btn.disabled = true;
       btn.innerHTML = `<span class="animate-spin inline-block text-xs mr-1">⌛</span> ${startFromZero ? 'Sincronizando Todo o Histórico...' : 'Sincronizando com ADN...'}`;
     }
+
+    // Inicializa a Barra de Progresso Visual em Tempo Real
+    const cardProgress = document.getElementById('syncProgressBarCard');
+    const barFill = document.getElementById('syncProgressBarFill');
+    const txtPercent = document.getElementById('syncProgressPercent');
+    const txtBatch = document.getElementById('syncProgressBatchTag');
+    const txtStatus = document.getElementById('syncProgressStatusText');
+    const txtDetails = document.getElementById('syncProgressDetails');
+    const txtTimer = document.getElementById('syncProgressTimer');
+
+    if (cardProgress) {
+      cardProgress.classList.remove('hidden');
+      if (barFill) {
+        barFill.style.width = '5%';
+        barFill.className = 'bg-gradient-to-r from-emerald-500 via-teal-400 to-brand-400 h-full transition-all duration-300 ease-out';
+      }
+      if (txtPercent) txtPercent.innerText = '5%';
+      if (txtBatch) txtBatch.innerText = 'Iniciando conexão...';
+      if (txtStatus) txtStatus.innerText = startFromZero ? 'Iniciando varredura completa desde o NSU 0...' : 'Conectando ao canal mTLS da Receita Federal...';
+      if (txtDetails) txtDetails.innerText = 'Aguardando primeiro lote...';
+      if (txtTimer) txtTimer.innerText = 'Tempo decorrido: 0s';
+      cardProgress.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    const startTime = Date.now();
+    let pollInterval = null;
+
+    // Polling contínuo do progresso no servidor (a cada 600ms)
+    pollInterval = setInterval(async () => {
+      try {
+        const prog = await safeFetchJson(`/api/adn/sync-progress?cnpj=${cleanCnpj}`);
+        if (!prog) return;
+
+        const elapsedSec = Math.round((Date.now() - startTime) / 1000);
+        if (txtTimer) txtTimer.innerText = `Tempo decorrido: ${elapsedSec}s`;
+
+        if (barFill && prog.percent !== undefined) {
+          barFill.style.width = `${Math.max(5, prog.percent)}%`;
+        }
+        if (txtPercent && prog.percent !== undefined) {
+          txtPercent.innerText = `${prog.percent}%`;
+        }
+        if (txtBatch && prog.batch !== undefined) {
+          txtBatch.innerText = `Lote ${prog.batch} de ~${prog.maxBatches || 35}`;
+        }
+        if (txtStatus && prog.status) {
+          txtStatus.innerText = prog.status;
+        }
+        if (txtDetails) {
+          txtDetails.innerText = `NSU: ${prog.currentNsu || 0} • ${prog.totalNovas || 0} nova(s) nota(s) • ${prog.totalEventos || 0} cancelamento(s)`;
+        }
+      } catch (pollErr) {
+        // Silencioso para não poluir console
+      }
+    }, 600);
 
     this.showToast(startFromZero ? 'Iniciando sincronização completa por NSU no ADN...' : 'Buscando novos documentos no ADN...', 'info');
 
@@ -4478,20 +4534,43 @@ const App = {
         })
       });
 
+      clearInterval(pollInterval);
+
       if (!res.success) {
+        if (barFill) barFill.className = 'bg-rose-500 h-full transition-all duration-300';
+        if (txtStatus) txtStatus.innerText = 'Erro na sincronização';
         window.friendlyErrorModal.show(res.error);
       } else {
         await this.loadHistory();
         const totalNovas = res.totalNovas !== undefined ? res.totalNovas : (res.totalSincronizadas || 0);
         const totalEv = res.totalEventos || 0;
         const totalAt = res.totalAtualizadas || 0;
+
+        if (barFill) {
+          barFill.style.width = '100%';
+          barFill.className = 'bg-emerald-500 h-full transition-all duration-300';
+        }
+        if (txtPercent) txtPercent.innerText = '100%';
+        if (txtBatch) txtBatch.innerText = 'Concluído!';
+        if (txtStatus) txtStatus.innerText = `Sincronização concluída com sucesso! (${Math.round((Date.now() - startTime) / 1000)}s)`;
+        if (txtDetails) {
+          txtDetails.innerText = `${totalNovas} nova(s) NFS-e • ${totalEv} cancelamento(s) • Último NSU: ${res.ultNSU || '-'}`;
+        }
+
         const msgToast = (totalEv > 0 || totalNovas > 0)
           ? `Sincronização ADN concluída! ${totalNovas} nova(s) NFS-e e ${totalEv} cancelamento(s)/evento(s) atualizados.`
           : `Sincronização com o ADN concluída! Todos os documentos já estão atualizados.`;
         this.showToast(msgToast);
-        alert(`Sincronização ADN Oficial Concluída!\n\nNovas NFS-e baixadas: ${totalNovas}\nEventos / Cancelamentos atualizados: ${totalEv}\nDocumentos verificados/validados: ${totalAt}\nÚltimo NSU da fila: ${res.ultNSU}\nTotal de notas disponíveis: ${res.notas ? res.notas.length : 0}`);
+
+        // Oculta suavemente a barra após 5 segundos
+        setTimeout(() => {
+          if (cardProgress) cardProgress.classList.add('hidden');
+        }, 5000);
       }
     } catch (e) {
+      clearInterval(pollInterval);
+      if (barFill) barFill.className = 'bg-rose-500 h-full transition-all duration-300';
+      if (txtStatus) txtStatus.innerText = `Falha: ${e.message}`;
       window.friendlyErrorModal.show({
         title: 'Falha na Sincronização ADN',
         category: 'Ambiente de Dados Nacional',
@@ -4499,9 +4578,85 @@ const App = {
         technicalDetail: e.message
       });
     } finally {
+      if (pollInterval) clearInterval(pollInterval);
       if (btn) {
         btn.disabled = false;
         btn.innerHTML = origHtml;
+        if (window.lucide) lucide.createIcons();
+      }
+      this.loadSchedulerStatus();
+    }
+  },
+
+  // --- ROBÔ AGENDADO NOTURNO ---
+  async loadSchedulerStatus() {
+    try {
+      const res = await safeFetchJson('/api/scheduler/status');
+      if (!res) return;
+
+      const badge = document.getElementById('schedulerStatusBadge');
+      if (badge) {
+        badge.innerText = res.enabled ? 'ATIVO' : 'INATIVO';
+        badge.className = res.enabled
+          ? 'px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-800'
+          : 'px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-slate-100 text-slate-600';
+      }
+
+      const txtHour = document.getElementById('schedulerHourText');
+      if (txtHour) txtHour.innerText = `${res.scheduledTimeFormatted} (Diário)`;
+
+      const txtLast = document.getElementById('schedulerLastRunText');
+      if (txtLast) txtLast.innerText = res.lastRunDate || 'Ainda não executado';
+
+      const txtNext = document.getElementById('schedulerNextRunText');
+      if (txtNext) txtNext.innerText = res.nextRunTime || '-';
+
+      const logContainer = document.getElementById('schedulerLogsContainer');
+      if (logContainer) {
+        if (!res.logs || res.logs.length === 0) {
+          logContainer.innerHTML = '<div class="text-slate-500 italic">Nenhum log registrado ainda...</div>';
+        } else {
+          logContainer.innerHTML = res.logs.map(l => {
+            let color = 'text-slate-300';
+            if (l.tipo === 'success') color = 'text-emerald-400 font-bold';
+            else if (l.tipo === 'warn') color = 'text-amber-400';
+            else if (l.tipo === 'error') color = 'text-rose-400 font-bold';
+            return `<div class="${color}">[${l.timestamp}] ${l.mensagem}</div>`;
+          }).join('');
+        }
+      }
+    } catch (e) {
+      console.warn('Erro ao carregar status do agendador:', e.message);
+    }
+  },
+
+  async runSchedulerNow() {
+    const btn = document.getElementById('btnRunSchedulerNow');
+    let orig = '';
+    if (btn) {
+      orig = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i data-lucide="refresh-cw" class="w-3.5 h-3.5 animate-spin"></i><span>Executando Varredura...</span>';
+      if (window.lucide) lucide.createIcons();
+    }
+
+    this.showToast('Iniciando varredura e sincronização em lote de todas as empresas...', 'info');
+
+    try {
+      const res = await safeFetchJson('/api/scheduler/run-now', { method: 'POST' });
+      if (res && res.success) {
+        this.showToast(res.message, 'success');
+        await this.loadHistory();
+      } else {
+        this.showToast(res?.message || 'Erro ao executar o robô.', 'error');
+      }
+      await this.loadSchedulerStatus();
+    } catch (err) {
+      this.showToast('Erro ao disparar robô: ' + err.message, 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = orig;
         if (window.lucide) lucide.createIcons();
       }
     }
@@ -5896,6 +6051,7 @@ const App = {
     if (tabId === 'dashboard') this.renderDashboard();
     if (tabId === 'historico') {
       this.renderHistoryTable();
+      this.loadSchedulerStatus();
       setTimeout(() => this.setupDualScrollbar(), 60);
     }
     if (tabId === 'fechamento') this.loadFechamentoFiscal();
