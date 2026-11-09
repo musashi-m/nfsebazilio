@@ -1547,7 +1547,7 @@
                 </label>
                 <div class="relative">
                   <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-semibold text-slate-500">R$</span>
-                  <input type="number" id="fValorServico" step="0.01" min="0" placeholder="0,00" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+                  <input type="text" id="fValorServico" inputmode="numeric" placeholder="0,00" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
                 </div>
               </div>
               <div>
@@ -1557,7 +1557,7 @@
                 </label>
                 <div class="relative">
                   <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-semibold text-slate-400">R$</span>
-                  <input type="number" id="fValorIntermediario" step="0.01" min="0" placeholder="0,00" class="w-full pl-9 pr-3 py-2 border border-slate-200 bg-slate-50 rounded-xl text-xs font-mono text-slate-700 outline-none">
+                  <input type="text" id="fValorIntermediario" inputmode="numeric" placeholder="0,00" class="w-full pl-9 pr-3 py-2 border border-slate-200 bg-slate-50 rounded-xl text-xs font-mono text-slate-700 outline-none">
                 </div>
               </div>
               <div>
@@ -1567,7 +1567,7 @@
                 </label>
                 <div class="relative">
                   <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-semibold text-slate-400">R$</span>
-                  <input type="number" id="fDescontoIncondicionado" step="0.01" min="0" placeholder="0,00" class="w-full pl-9 pr-3 py-2 border border-slate-200 bg-slate-50 rounded-xl text-xs font-mono text-slate-700 outline-none">
+                  <input type="text" id="fDescontoIncondicionado" inputmode="numeric" placeholder="0,00" class="w-full pl-9 pr-3 py-2 border border-slate-200 bg-slate-50 rounded-xl text-xs font-mono text-slate-700 outline-none">
                 </div>
               </div>
               <div>
@@ -1577,7 +1577,7 @@
                 </label>
                 <div class="relative">
                   <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-semibold text-slate-400">R$</span>
-                  <input type="number" id="fDescontoCondicionado" step="0.01" min="0" placeholder="0,00" class="w-full pl-9 pr-3 py-2 border border-slate-200 bg-slate-50 rounded-xl text-xs font-mono text-slate-700 outline-none">
+                  <input type="text" id="fDescontoCondicionado" inputmode="numeric" placeholder="0,00" class="w-full pl-9 pr-3 py-2 border border-slate-200 bg-slate-50 rounded-xl text-xs font-mono text-slate-700 outline-none">
                 </div>
               </div>
             </div>
@@ -1823,7 +1823,7 @@
                   </label>
                   <div class="relative">
                     <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-semibold text-slate-400">R$</span>
-                    <input type="number" id="fRetIr" step="0.01" min="0" placeholder="0,00" class="w-full pl-9 pr-3 py-2 border border-slate-200 bg-slate-50 rounded-xl text-xs font-mono text-slate-700 outline-none">
+                    <input type="text" id="fRetIr" inputmode="numeric" placeholder="0,00" class="w-full pl-9 pr-3 py-2 border border-slate-200 bg-slate-50 rounded-xl text-xs font-mono text-slate-700 outline-none">
                   </div>
                 </div>
                 <div>
@@ -1833,7 +1833,7 @@
                   </label>
                   <div class="relative">
                     <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-semibold text-slate-400">R$</span>
-                    <input type="number" id="fRetContrSociais" step="0.01" min="0" placeholder="0,00" class="w-full pl-9 pr-3 py-2 border border-slate-200 bg-slate-50 rounded-xl text-xs font-mono text-slate-700 outline-none">
+                    <input type="text" id="fRetContrSociais" inputmode="numeric" placeholder="0,00" class="w-full pl-9 pr-3 py-2 border border-slate-200 bg-slate-50 rounded-xl text-xs font-mono text-slate-700 outline-none">
                   </div>
                 </div>
                 <div>
@@ -1843,7 +1843,7 @@
                   </label>
                   <div class="relative">
                     <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-semibold text-slate-400">R$</span>
-                    <input type="number" id="fRetInss" step="0.01" min="0" placeholder="0,00" class="w-full pl-9 pr-3 py-2 border border-slate-200 bg-slate-50 rounded-xl text-xs font-mono text-slate-700 outline-none">
+                    <input type="text" id="fRetInss" inputmode="numeric" placeholder="0,00" class="w-full pl-9 pr-3 py-2 border border-slate-200 bg-slate-50 rounded-xl text-xs font-mono text-slate-700 outline-none">
                   </div>
                 </div>
               </div>
@@ -1944,7 +1944,7 @@
                     </label>
                     <div class="relative">
                       <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs text-slate-400">R$</span>
-                      <input type="number" id="fValTribFed" step="0.01" min="0" value="0.00" placeholder="0.00" oninput="App.calculateEmissionTotals()" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+                      <input type="text" id="fValTribFed" inputmode="numeric" placeholder="0,00" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
                     </div>
                   </div>
                   <div>
@@ -1953,7 +1953,7 @@
                     </label>
                     <div class="relative">
                       <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs text-slate-400">R$</span>
-                      <input type="number" id="fValTribEst" step="0.01" min="0" value="0.00" placeholder="0.00" oninput="App.calculateEmissionTotals()" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+                      <input type="text" id="fValTribEst" inputmode="numeric" placeholder="0,00" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
                     </div>
                   </div>
                   <div>
@@ -1962,7 +1962,7 @@
                     </label>
                     <div class="relative">
                       <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs text-slate-400">R$</span>
-                      <input type="number" id="fValTribMun" step="0.01" min="0" value="0.00" placeholder="0.00" oninput="App.calculateEmissionTotals()" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+                      <input type="text" id="fValTribMun" inputmode="numeric" placeholder="0,00" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
                     </div>
                   </div>
                 </div>

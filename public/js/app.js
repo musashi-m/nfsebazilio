@@ -346,11 +346,22 @@ const App = {
       });
     }
 
-    // Formulário de emissão: Cálculos dinâmicos de impostos e retenções
-    [
+    // Formulário de emissão: Máscara monetária em tempo real R$ 0,00
+    const moneyFieldIds = [
       'fValorServico', 'fValorIntermediario', 'fDescontoIncondicionado', 'fDescontoCondicionado',
-      'fAliquotaIss', 'fAliquotaRetencao', 'fRetIr', 'fRetContrSociais', 'fRetInss', 'fAliquotaSimplesNacional',
-      'fValTribFed', 'fValTribEst', 'fValTribMun', 'fAliqTribFed', 'fAliqTribEst', 'fAliqTribMun'
+      'fRetIr', 'fRetContrSociais', 'fRetInss', 'fValTribFed', 'fValTribEst', 'fValTribMun'
+    ];
+    moneyFieldIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        this.bindMoneyMask(el);
+      }
+    });
+
+    // Alíquotas e outros campos tributários numéricos percentuais
+    [
+      'fAliquotaIss', 'fAliquotaRetencao', 'fAliquotaSimplesNacional',
+      'fAliqTribFed', 'fAliqTribEst', 'fAliqTribMun'
     ].forEach(id => {
       const el = document.getElementById(id);
       if (el) {
@@ -1232,16 +1243,16 @@ const App = {
       if (nfse.valores) {
         const v = nfse.valores;
         const vServ = Number(v.valorServico ?? v.vServ ?? v.valorLiquido ?? v.vLiq ?? 0);
-        setVal('fValorServico', vServ > 0 ? vServ.toFixed(2) : '');
+        setVal('fValorServico', vServ > 0 ? vServ.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
 
         const vInterm = Number(v.valorIntermediario ?? 0);
-        setVal('fValorIntermediario', vInterm > 0 ? vInterm.toFixed(2) : '');
+        setVal('fValorIntermediario', vInterm > 0 ? vInterm.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
 
         const vDescIncond = Number(v.descontoIncondicionado ?? v.vDescIncond ?? 0);
-        setVal('fDescontoIncondicionado', vDescIncond > 0 ? vDescIncond.toFixed(2) : '');
+        setVal('fDescontoIncondicionado', vDescIncond > 0 ? vDescIncond.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
 
         const vDescCond = Number(v.descontoCondicionado ?? v.vDescCond ?? 0);
-        setVal('fDescontoCondicionado', vDescCond > 0 ? vDescCond.toFixed(2) : '');
+        setVal('fDescontoCondicionado', vDescCond > 0 ? vDescCond.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
 
         // Retenção ISSQN
         const isRetido = this.isNotaRetida(nfse) || Boolean(v.iss?.retido || v.vISSRet > 0);
@@ -1551,10 +1562,10 @@ const App = {
     // 2. Valores e Retenções
     if (template.valorServico !== undefined && template.valorServico !== null && template.valorServico !== '') {
       const v = Number(template.valorServico);
-      setVal('fValorServico', v > 0 ? v.toFixed(2) : '');
+      setVal('fValorServico', v > 0 ? v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
     }
-    if (template.descontoIncondicionado) setVal('fDescontoIncondicionado', Number(template.descontoIncondicionado).toFixed(2));
-    if (template.descontoCondicionado) setVal('fDescontoCondicionado', Number(template.descontoCondicionado).toFixed(2));
+    if (template.descontoIncondicionado) setVal('fDescontoIncondicionado', Number(template.descontoIncondicionado).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    if (template.descontoCondicionado) setVal('fDescontoCondicionado', Number(template.descontoCondicionado).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 
     const retIss = template.retencaoIssqn || 'nao';
     setRadio('fRetencaoIssqnRadio', retIss);
@@ -1658,8 +1669,8 @@ const App = {
 
     const getVal = (id) => document.getElementById(id)?.value?.trim() || '';
     const getNum = (id) => {
-      const v = document.getElementById(id)?.value?.replace(',', '.');
-      return v && !isNaN(v) ? parseFloat(v) : null;
+      const v = this.parseMoney(document.getElementById(id)?.value);
+      return v > 0 ? v : null;
     };
 
     const templateData = {
@@ -1874,7 +1885,7 @@ const App = {
         break;
       }
       case 'fValorServico': {
-        const num = parseFloat(val);
+        const num = this.parseMoney(val);
         valid = !isNaN(num) && num > 0;
         break;
       }
@@ -3066,7 +3077,7 @@ const App = {
   },
 
   autoCalculateFederalTaxes() {
-    const getNum = id => parseFloat(document.getElementById(id)?.value || 0) || 0;
+    const getNum = id => this.parseMoney(document.getElementById(id)?.value);
     const vServ = getNum('fValorServico');
     if (vServ <= 0) {
       alert('Informe o Valor dos Serviços primeiro para calcular as alíquotas federais sugeridas.');
@@ -4837,7 +4848,7 @@ const App = {
   },
 
   calculateEmissionTotals() {
-    const getNum = id => parseFloat(document.getElementById(id)?.value || 0) || 0;
+    const getNum = id => this.parseMoney(document.getElementById(id)?.value);
 
     const vServ = getNum('fValorServico');
     const vDescIncond = getNum('fDescontoIncondicionado');
@@ -5190,7 +5201,7 @@ const App = {
 
   getEmissionPayload() {
     const getVal = id => (document.getElementById(id)?.value || '').trim();
-    const getNum = id => parseFloat(document.getElementById(id)?.value || 0) || 0;
+    const getNum = id => this.parseMoney(document.getElementById(id)?.value);
     const chkSerieNum = document.getElementById('chkInformarSerieNum')?.checked;
     const tomadorLocalizacao = document.querySelector('input[name="fTomadorLocalizacao"]:checked')?.value || 'brasil';
     const tomadorDocRaw = getVal('fTomadorDoc').replace(/\D/g, '');
@@ -6710,6 +6721,76 @@ const App = {
     const numEl = document.getElementById('fTomadorNumero');
     if (numEl && !numEl.value) {
       numEl.focus();
+    }
+  },
+
+  parseMoney(val) {
+    if (typeof val === 'number') return isNaN(val) ? 0 : val;
+    if (!val) return 0;
+    const str = String(val).trim();
+    const clean = str.replace(/[R$\s]/g, '');
+    if (!clean) return 0;
+    if (clean.includes(',')) {
+      const normalized = clean.replace(/\./g, '').replace(',', '.');
+      const num = parseFloat(normalized);
+      return isNaN(num) ? 0 : num;
+    }
+    const num = parseFloat(clean);
+    return isNaN(num) ? 0 : num;
+  },
+
+  formatMoney(val) {
+    const num = this.parseMoney(val);
+    if (!num || num <= 0) return '';
+    return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  },
+
+  bindMoneyMask(input) {
+    if (!input) return;
+
+    const format = () => {
+      let digits = (input.value || '').replace(/\D/g, '');
+      if (!digits) {
+        input.value = '';
+        return;
+      }
+      digits = digits.replace(/^0+/, '');
+      if (!digits) {
+        input.value = '';
+        return;
+      }
+      if (digits.length === 1) {
+        input.value = '0,0' + digits;
+      } else if (digits.length === 2) {
+        input.value = '0,' + digits;
+      } else {
+        const intPart = digits.slice(0, -2);
+        const decPart = digits.slice(-2);
+        const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        input.value = `${formattedInt},${decPart}`;
+      }
+    };
+
+    input.addEventListener('input', () => {
+      format();
+      this.calculateEmissionTotals();
+    });
+
+    input.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const text = (e.clipboardData || window.clipboardData)?.getData('text') || '';
+      const num = this.parseMoney(text);
+      if (num > 0) {
+        input.value = num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      } else {
+        input.value = '';
+      }
+      this.calculateEmissionTotals();
+    });
+
+    // Se já veio com algum valor prévio numérico, formata
+    if (input.value && !input.value.includes(',')) {
+      format();
     }
   }
 };
