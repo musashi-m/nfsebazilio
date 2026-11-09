@@ -21,6 +21,7 @@ const serproService = require('./src/services/serproService');
 const storageService = require('./src/services/storageService');
 const xmlParserService = require('./src/services/xmlParserService');
 const representationService = require('./src/services/representationService');
+const fiscalService = require('./src/services/fiscalService');
 const { translateError, ERROR_DICTIONARY } = require('./src/services/errorTranslator');
 const {
   CODIGOS_TRIBUTACAO_NACIONAL,
@@ -906,6 +907,70 @@ app.get('/api/adn/nfse/:chave/xml', (req, res) => {
   res.setHeader('Content-Type', 'application/xml');
   res.setHeader('Content-Disposition', `attachment; filename=NFSe_${chave}.xml`);
   res.send(xml);
+});
+
+// ==========================================
+// FECHAMENTO FISCAL MENSAL & RBT12 (SIMPLES NACIONAL)
+// ==========================================
+
+// Dados do Fechamento Fiscal Mensal por Empresa e Competência
+app.get('/api/fiscal/closing', (req, res) => {
+  try {
+    const sessionCnpj = resolveSessionCnpj(req);
+    const cnpj = req.query.cnpj || sessionCnpj || '12627708000156';
+    const competencia = req.query.competencia || null;
+    const data = fiscalService.getMonthlyClosing(cnpj, competencia);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Termômetro RBT12 (LC 123/2006) e Alíquotas Efetivas
+app.get('/api/fiscal/rbt12', (req, res) => {
+  try {
+    const sessionCnpj = resolveSessionCnpj(req);
+    const cnpj = req.query.cnpj || sessionCnpj || '12627708000156';
+    const competencia = req.query.competencia || null;
+    const data = fiscalService.getRbt12(cnpj, competencia);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Exportação em Planilha CSV (Padrão Excel pt-BR com delimitador ';' e UTF-8 BOM)
+app.get('/api/fiscal/export/csv', (req, res) => {
+  try {
+    const sessionCnpj = resolveSessionCnpj(req);
+    const cnpj = req.query.cnpj || sessionCnpj || '12627708000156';
+    const competencia = req.query.competencia || null;
+    const cleanCnpj = (cnpj || '').replace(/\D/g, '');
+    const csvContent = fiscalService.generateClosingCsv(cnpj, competencia);
+    
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="Fechamento_Fiscal_${cleanCnpj}_${competencia || 'atual'}.csv"`);
+    res.send(csvContent);
+  } catch (err) {
+    res.status(500).send('Erro ao gerar CSV: ' + err.message);
+  }
+});
+
+// Exportação de Pacote ZIP (Todos os XMLs oficiais + Planilha CSV + Resumo em TXT)
+app.get('/api/fiscal/export/zip', (req, res) => {
+  try {
+    const sessionCnpj = resolveSessionCnpj(req);
+    const cnpj = req.query.cnpj || sessionCnpj || '12627708000156';
+    const competencia = req.query.competencia || null;
+    const cleanCnpj = (cnpj || '').replace(/\D/g, '');
+    const zipBuffer = fiscalService.generateClosingZip(cnpj, competencia);
+    
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="Pacote_Fiscal_NFSe_${cleanCnpj}_${competencia || 'atual'}.zip"`);
+    res.send(zipBuffer);
+  } catch (err) {
+    res.status(500).send('Erro ao gerar pacote ZIP: ' + err.message);
+  }
 });
 
 // ==========================================

@@ -5805,6 +5805,9 @@ const App = {
         }).join('');
       }
     }
+
+    // Atualiza Termômetro RBT12 no Dashboard
+    this.updateDashboardRbt12(cleanRepCnpj);
   },
 
   // --- AMBIENTES ---
@@ -5895,6 +5898,7 @@ const App = {
       this.renderHistoryTable();
       setTimeout(() => this.setupDualScrollbar(), 60);
     }
+    if (tabId === 'fechamento') this.loadFechamentoFiscal();
     if (tabId === 'certificado') this.renderCertManagement();
     if (tabId === 'ajuda') this.renderErrorDictionary();
     if (tabId === 'emissao') {
@@ -6869,6 +6873,519 @@ const App = {
         format();
       }
     }
+  },
+
+  // --- FECHAMENTO FISCAL MENSAL & RBT12 ---
+  async updateDashboardRbt12(cnpj) {
+    try {
+      const clean = cnpj || (this.state.activeRepresentation?.cnpjRaw || '').replace(/\D/g, '') || '12627708000156';
+      const rbt = await safeFetchJson(`/api/fiscal/rbt12?cnpj=${clean}`);
+      if (!rbt || !rbt.faixa) return;
+
+      const elVal = document.getElementById('dashRbt12Valor');
+      if (elVal) elVal.innerText = rbt.rbt12Oficial.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+      const elTag = document.getElementById('dashRbt12FaixaTag');
+      if (elTag) elTag.innerText = rbt.faixa.descricao.split(' - ')[0] || 'Faixa 1';
+
+      const elSub = document.getElementById('dashRbt12Sublimite');
+      if (elSub) {
+        elSub.innerText = `Sublimite Estadual: ${rbt.sublimiteEstadual.percentual}% consumido (${rbt.sublimiteEstadual.saldoRestante.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} restantes)`;
+      }
+    } catch (e) {
+      console.warn('Erro ao atualizar RBT12 no dashboard:', e);
+    }
+  },
+
+  async loadFechamentoFiscal() {
+    try {
+      // 1. Popula select de empresas representadas
+      const empSelect = document.getElementById('fechamentoEmpresaSelect');
+      const activeClean = (this.state.activeRepresentation?.cnpjRaw || '').replace(/\D/g, '');
+      const currentSelected = empSelect ? empSelect.value : '';
+
+      const recents = this.state.recentRepresentations || [];
+      const companies = [
+        { cnpjRaw: '12627708000156', razaoSocial: 'BAZILIO CONTABILIDADE LTDA' },
+        ...recents
+      ];
+
+      // Remove duplicatas
+      const unique = [];
+      const seen = new Set();
+      companies.forEach(c => {
+        const raw = (c.cnpjRaw || c.cnpj || '').replace(/\D/g, '');
+        if (raw && !seen.has(raw)) {
+          seen.add(raw);
+          unique.push({ cnpjRaw: raw, razaoSocial: c.razaoSocial || c.nome || raw });
+        }
+      });
+
+      if (empSelect) {
+        const valToSelect = currentSelected || activeClean || unique[0]?.cnpjRaw || '12627708000156';
+        empSelect.innerHTML = unique.map(c => 
+          `<option value="${c.cnpjRaw}" ${c.cnpjRaw === valToSelect ? 'selected' : ''}>${c.razaoSocial}</option>`
+        ).join('');
+      }
+
+      const targetCnpj = empSelect?.value || activeClean || '12627708000156';
+      const mesSelect = document.getElementById('fechamentoMesSelect');
+      const targetMes = mesSelect?.value || null;
+
+      // 2. Busca dados de Fechamento e RBT12 em paralelo
+      const [closing, rbt] = await Promise.all([
+        safeFetchJson(`/api/fiscal/closing?cnpj=${targetCnpj}${targetMes ? `&competencia=${targetMes}` : ''}`),
+        safeFetchJson(`/api/fiscal/rbt12?cnpj=${targetCnpj}${targetMes ? `&competencia=${targetMes}` : ''}`)
+      ]);
+
+      this.state.fechamentoData = closing;
+      this.state.rbt12Data = rbt;
+
+      // 3. Popula seletor de competência se necessário
+      if (mesSelect && closing?.mesesDisponiveis) {
+        const curMes = closing.competencia;
+        mesSelect.innerHTML = closing.mesesDisponiveis.map(m => {
+          const [ano, mes] = m.split('-');
+          return `<option value="${m}" ${m === curMes ? 'selected' : ''}>${mes}/${ano}</option>`;
+        }).join('');
+      }
+
+      // 4. Renderiza view
+      this.renderFechamentoView();
+    } catch (err) {
+      console.error('Erro ao carregar fechamento fiscal:', err);
+      this.showToast('Erro ao carregar fechamento fiscal: ' + err.message, 'error');
+    }
+  },
+
+  handleFechamentoEmpresaChange() {
+    const mesSelect = document.getElementById('fechamentoMesSelect');
+    if (mesSelect) mesSelect.value = '';
+    this.loadFechamentoFiscal();
+  },
+
+  handleFechamentoMesChange() {
+    this.loadFechamentoFiscal();
+  },
+
+  handleFechamentoBuscaInput() {
+    const input = document.getElementById('fechamentoBuscaInput');
+    this.state.fechamentoSearchQuery = (input?.value || '').toLowerCase().trim();
+    this.renderFechamentoTable();
+  },
+
+  setFechamentoStatusFilter(status) {
+    this.state.fechamentoFilterStatus = status;
+
+    const btnTodas = document.getElementById('btnFltStatusTodas');
+    const btnAut = document.getElementById('btnFltStatusAut');
+    const btnCanc = document.getElementById('btnFltStatusCanc');
+
+    [btnTodas, btnAut, btnCanc].forEach(b => {
+      if (b) {
+        b.classList.remove('bg-white', 'text-slate-800', 'shadow-xs');
+        b.classList.add('text-slate-600');
+      }
+    });
+
+    if (status === 'TODAS' && btnTodas) {
+      btnTodas.classList.add('bg-white', 'text-slate-800', 'shadow-xs');
+      btnTodas.classList.remove('text-slate-600');
+    } else if (status === 'AUTORIZADA' && btnAut) {
+      btnAut.classList.add('bg-white', 'text-slate-800', 'shadow-xs');
+      btnAut.classList.remove('text-slate-600');
+    } else if (status === 'CANCELADA' && btnCanc) {
+      btnCanc.classList.add('bg-white', 'text-slate-800', 'shadow-xs');
+      btnCanc.classList.remove('text-slate-600');
+    }
+
+    this.renderFechamentoTable();
+  },
+
+  renderFechamentoView() {
+    const closing = this.state.fechamentoData;
+    const rbt = this.state.rbt12Data;
+    if (!closing || !rbt) return;
+
+    const t = closing.totais || {};
+    const fmt = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    // 1. Atualiza Cards de Resumo Fiscal
+    const elFat = document.getElementById('fechamentoCardFaturado');
+    if (elFat) elFat.innerText = fmt(t.totalFaturado);
+
+    const elQtd = document.getElementById('fechamentoCardNotasQtd');
+    if (elQtd) elQtd.innerText = `${t.qtdAutorizadas} autorizada(s)${t.qtdCanceladas > 0 ? ` • ${t.qtdCanceladas} cancelada(s)` : ''}`;
+
+    const elBc = document.getElementById('fechamentoCardBaseCalculo');
+    if (elBc) elBc.innerText = fmt(t.totalBaseCalculo);
+
+    const elDesc = document.getElementById('fechamentoCardDescontos');
+    if (elDesc) elDesc.innerText = `Descontos: ${fmt(t.totalDescIncond)}`;
+
+    const elIssP = document.getElementById('fechamentoCardIssProprio');
+    if (elIssP) elIssP.innerText = fmt(t.totalIssProprio);
+
+    const elIssR = document.getElementById('fechamentoCardIssRetido');
+    if (elIssR) elIssR.innerText = fmt(t.totalIssRetido);
+
+    const elRetFed = document.getElementById('fechamentoCardRetFederais');
+    if (elRetFed) elRetFed.innerText = fmt(t.totalRetencoesFederais);
+
+    const elRetDet = document.getElementById('fechamentoCardRetDetalhe');
+    if (elRetDet) {
+      elRetDet.innerText = `IR: ${fmt(t.totalIr)} | CSRF: ${fmt(t.totalContrSociais)} | INSS: ${fmt(t.totalInss)}`;
+    }
+
+    const elLiq = document.getElementById('fechamentoCardValorLiquido');
+    if (elLiq) elLiq.innerText = fmt(t.totalLiquido);
+
+    // 2. Atualiza Termômetro RBT12
+    const elRbtTot = document.getElementById('txtRbt12Total');
+    if (elRbtTot) elRbtTot.innerText = fmt(rbt.rbt12Oficial);
+
+    const elFaixa = document.getElementById('txtRbt12Faixa');
+    if (elFaixa) elFaixa.innerText = rbt.faixa.descricao;
+
+    const elAnx3 = document.getElementById('txtAliqEfetivaAnexo3');
+    if (elAnx3) elAnx3.innerText = rbt.faixa.anexo3.aliqEfetiva;
+
+    const elAnx4 = document.getElementById('txtAliqEfetivaAnexo4');
+    if (elAnx4) elAnx4.innerText = rbt.faixa.anexo4.aliqEfetiva;
+
+    const elAnx5 = document.getElementById('txtAliqEfetivaAnexo5');
+    if (elAnx5) elAnx5.innerText = rbt.faixa.anexo5.aliqEfetiva;
+
+    // Sublimite Estadual
+    const sub = rbt.sublimiteEstadual;
+    const barSub = document.getElementById('barSublimiteProgresso');
+    if (barSub) {
+      barSub.style.width = `${Math.min(100, sub.percentual)}%`;
+      if (sub.status === 'estourado') {
+        barSub.className = 'bg-rose-500 h-full transition-all duration-500';
+      } else if (sub.status === 'alerta') {
+        barSub.className = 'bg-amber-400 h-full transition-all duration-500';
+      } else {
+        barSub.className = 'bg-gradient-to-r from-emerald-500 to-teal-400 h-full transition-all duration-500';
+      }
+    }
+    const txtSubCons = document.getElementById('txtSublimiteConsumido');
+    if (txtSubCons) txtSubCons.innerText = `${sub.percentual}% consumido`;
+
+    const txtSubSal = document.getElementById('txtSublimiteSaldo');
+    if (txtSubSal) txtSubSal.innerText = `Saldo restante: ${fmt(sub.saldoRestante)}`;
+
+    const badgeSub = document.getElementById('txtSublimiteStatusBadge');
+    if (badgeSub) {
+      if (sub.status === 'estourado') {
+        badgeSub.innerText = 'Sublimite Ultrapassado';
+        badgeSub.className = 'px-2 py-0.5 rounded font-bold text-[10px] uppercase bg-rose-500/20 text-rose-300 border border-rose-500/30';
+      } else if (sub.status === 'alerta') {
+        badgeSub.innerText = 'Atenção (>80%)';
+        badgeSub.className = 'px-2 py-0.5 rounded font-bold text-[10px] uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30';
+      } else {
+        badgeSub.innerText = 'Dentro do Limite';
+        badgeSub.className = 'px-2 py-0.5 rounded font-bold text-[10px] uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+      }
+    }
+
+    // Limite Geral
+    const lim = rbt.limiteGeral;
+    const barLim = document.getElementById('barLimiteGeralProgresso');
+    if (barLim) {
+      barLim.style.width = `${Math.min(100, lim.percentual)}%`;
+      if (lim.status === 'estourado') {
+        barLim.className = 'bg-rose-500 h-full transition-all duration-500';
+      } else if (lim.status === 'alerta') {
+        barLim.className = 'bg-amber-400 h-full transition-all duration-500';
+      } else {
+        barLim.className = 'bg-gradient-to-r from-brand-500 to-indigo-400 h-full transition-all duration-500';
+      }
+    }
+    const txtLimCons = document.getElementById('txtLimiteGeralConsumido');
+    if (txtLimCons) txtLimCons.innerText = `${lim.percentual}% consumido`;
+
+    const txtLimSal = document.getElementById('txtLimiteGeralSaldo');
+    if (txtLimSal) txtLimSal.innerText = `Saldo restante: ${fmt(lim.saldoRestante)}`;
+
+    // Mini Gráfico de Barras dos 12 Meses
+    const chartContainer = document.getElementById('rbt12ChartContainer');
+    if (chartContainer && rbt.historicoMeses) {
+      const maxFat = Math.max(...rbt.historicoMeses.map(m => m.faturamento), 1);
+      chartContainer.innerHTML = rbt.historicoMeses.map(m => {
+        const heightPct = Math.max(8, Math.round((m.faturamento / maxFat) * 100));
+        const isCurrent = m.competencia === closing.competencia;
+        return `
+          <div class="flex flex-col items-center justify-end group">
+            <span class="text-[9px] text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap mb-1">
+              ${m.faturamento > 0 ? (m.faturamento >= 1000 ? (m.faturamento / 1000).toFixed(1) + 'k' : m.faturamento.toFixed(0)) : '0'}
+            </span>
+            <div class="w-full bg-slate-800/80 rounded-t h-16 flex items-end p-0.5">
+              <div class="w-full rounded-t transition-all ${isCurrent ? 'bg-amber-400' : 'bg-emerald-500 hover:bg-emerald-400'}" style="height: ${heightPct}%;" title="${m.competenciaFormatada}: ${fmt(m.faturamento)} (${m.qtdNotas} notas)"></div>
+            </div>
+            <span class="text-[10px] mt-1 font-mono ${isCurrent ? 'font-bold text-amber-300' : 'text-slate-400'}">${m.competenciaFormatada.split('/')[0]}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 3. Renderiza Tabela de Notas
+    this.renderFechamentoTable();
+
+    if (window.lucide) lucide.createIcons();
+  },
+
+  renderFechamentoTable() {
+    const closing = this.state.fechamentoData;
+    const tbody = document.getElementById('fechamentoTableBody');
+    if (!tbody || !closing) return;
+
+    let notas = closing.notas || [];
+    const q = this.state.fechamentoSearchQuery || '';
+    const st = this.state.fechamentoFilterStatus || 'TODAS';
+
+    if (st !== 'TODAS') {
+      notas = notas.filter(n => n.status === st);
+    }
+
+    if (q) {
+      notas = notas.filter(n => {
+        const doc = (n.tomador?.doc || '').toLowerCase();
+        const nome = (n.tomador?.nome || '').toLowerCase();
+        const num = String(n.numeroNfse || '').toLowerCase();
+        const dps = String(n.numeroDps || '').toLowerCase();
+        const desc = (n.servico?.descricao || '').toLowerCase();
+        return doc.includes(q) || nome.includes(q) || num.includes(q) || dps.includes(q) || desc.includes(q);
+      });
+    }
+
+    const badgeTotal = document.getElementById('fechamentoBadgeTotalNotas');
+    if (badgeTotal) badgeTotal.innerText = `${notas.length} de ${closing.totais?.qtdTotal || 0}`;
+
+    if (notas.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="11" class="px-4 py-8 text-center text-slate-400 text-xs font-sans">
+            <i data-lucide="inbox" class="w-8 h-8 mx-auto text-slate-300 mb-2"></i>
+            Nenhuma nota fiscal encontrada para os filtros selecionados na competência ${closing.competenciaFormatada}.
+          </td>
+        </tr>
+      `;
+      if (window.lucide) lucide.createIcons();
+      return;
+    }
+
+    const fmt = (v) => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    tbody.innerHTML = notas.map(n => {
+      const v = n.valores;
+      const isCanc = n.status === 'CANCELADA';
+      const statusBadge = isCanc 
+        ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700">CANCELADA</span>'
+        : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">AUTORIZADA</span>';
+
+      const issBadge = v.issRetido
+        ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700" title="Retido pelo tomador: R$ ${fmt(v.valorIssRetido)}">SIM (R$ ${fmt(v.valorIssRetido)})</span>`
+        : `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">NÃO</span>`;
+
+      const retFedBadge = v.totalRetFederais > 0
+        ? `<span class="text-rose-600 font-bold" title="IR: R$ ${fmt(v.retIr)} | CSRF: R$ ${fmt(v.retContrSociais)} | INSS: R$ ${fmt(v.retInss)}">R$ ${fmt(v.totalRetFederais)}</span>`
+        : '<span class="text-slate-400">-</span>';
+
+      const dataStr = n.dataEmissao ? new Date(n.dataEmissao).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '-';
+
+      return `
+        <tr class="hover:bg-slate-50 transition-colors ${isCanc ? 'opacity-60 bg-rose-50/20' : ''}">
+          <td class="px-4 py-3 font-bold text-slate-900 whitespace-nowrap">
+            ${n.numeroNfse && n.numeroNfse !== '-' ? `Nº ${n.numeroNfse}` : `DPS ${n.numeroDps}`}
+            <span class="text-[10px] text-slate-400 block font-normal font-sans">Série ${n.serie}</span>
+          </td>
+          <td class="px-4 py-3 text-slate-600 whitespace-nowrap text-[11px] font-sans">
+            ${dataStr}
+          </td>
+          <td class="px-4 py-3 font-sans max-w-xs">
+            <div class="font-bold text-slate-800 truncate" title="${n.tomador.nome}">${n.tomador.nome}</div>
+            <div class="text-[11px] text-slate-400 font-mono">${n.tomador.doc}</div>
+          </td>
+          <td class="px-4 py-3 font-sans max-w-xs">
+            <div class="truncate text-slate-600 text-[11px]" title="${n.servico.descricao}">${n.servico.descricao}</div>
+          </td>
+          <td class="px-4 py-3 text-right font-bold text-slate-900 whitespace-nowrap">
+            R$ ${fmt(v.valorServico)}
+          </td>
+          <td class="px-4 py-3 text-right text-slate-700 whitespace-nowrap">
+            R$ ${fmt(v.baseCalculo)}
+          </td>
+          <td class="px-4 py-3 text-center whitespace-nowrap font-sans">
+            ${issBadge}
+          </td>
+          <td class="px-4 py-3 text-right whitespace-nowrap">
+            ${retFedBadge}
+          </td>
+          <td class="px-4 py-3 text-right font-black text-teal-700 whitespace-nowrap">
+            R$ ${fmt(v.valorLiquido)}
+          </td>
+          <td class="px-4 py-3 text-center whitespace-nowrap font-sans">
+            ${statusBadge}
+          </td>
+          <td class="px-4 py-3 text-center whitespace-nowrap font-sans">
+            <div class="flex items-center justify-center space-x-1.5">
+              <button onclick="App.abrirDanfse('${n.chaveAcesso || n.id}')" class="p-1 text-slate-500 hover:text-brand-600 hover:bg-brand-50 rounded" title="Visualizar DANFSE">
+                <i data-lucide="eye" class="w-4 h-4"></i>
+              </button>
+              <button onclick="App.downloadXml('${n.chaveAcesso || n.id}')" class="p-1 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded" title="Baixar XML Oficial">
+                <i data-lucide="file-code" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    if (window.lucide) lucide.createIcons();
+  },
+
+  downloadFechamentoCsv() {
+    const closing = this.state.fechamentoData;
+    if (!closing) return;
+    const cnpj = closing.prestador?.cnpjRaw || '12627708000156';
+    const comp = closing.competencia || 'atual';
+    window.open(`/api/fiscal/export/csv?cnpj=${cnpj}&competencia=${comp}`, '_blank');
+  },
+
+  downloadFechamentoZip() {
+    const closing = this.state.fechamentoData;
+    if (!closing) return;
+    const cnpj = closing.prestador?.cnpjRaw || '12627708000156';
+    const comp = closing.competencia || 'atual';
+    window.open(`/api/fiscal/export/zip?cnpj=${cnpj}&competencia=${comp}`, '_blank');
+  },
+
+  printFechamentoReport() {
+    const closing = this.state.fechamentoData;
+    const rbt = this.state.rbt12Data;
+    if (!closing) return;
+
+    const p = closing.prestador;
+    const t = closing.totais;
+    const fmt = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const fmtNum = (v) => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const w = window.open('', '_blank');
+    w.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Fechamento Fiscal - ${p.razaoSocial} - ${closing.competenciaFormatada}</title>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; padding: 24px; color: #1e293b; font-size: 11px; }
+          .header { border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-start; }
+          h1 { margin: 0; font-size: 16px; font-weight: 800; color: #0f172a; }
+          h2 { margin: 0 0 8px 0; font-size: 13px; font-weight: 700; color: #334155; }
+          .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+          .card { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; background: #f8fafc; }
+          .card-title { font-size: 9px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px; }
+          .card-val { font-size: 14px; font-weight: 800; color: #0f172a; font-family: monospace; }
+          table { width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 12px; }
+          th { background: #f1f5f9; border-bottom: 1px solid #94a3b8; padding: 6px 8px; text-align: left; font-weight: 700; color: #475569; }
+          td { border-bottom: 1px solid #e2e8f0; padding: 5px 8px; font-family: monospace; }
+          .text-right { text-align: right; }
+          .text-center { text-align: center; }
+          .footer { margin-top: 24px; border-top: 1px solid #cbd5e1; padding-top: 8px; font-size: 9px; color: #64748b; text-align: center; }
+          @media print { body { padding: 0; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <h1>BAZILIO CONTABILIDADE LTDA • RELATÓRIO DE FECHAMENTO FISCAL MENSAL</h1>
+            <div style="margin-top: 4px; font-size: 11px;">
+              <strong>Empresa:</strong> ${p.razaoSocial} | <strong>CNPJ:</strong> ${p.cnpj} | <strong>Município:</strong> ${p.municipio}/${p.uf}
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 14px; font-weight: 800; color: #059669;">COMPETÊNCIA ${closing.competenciaFormatada}</div>
+            <div style="font-size: 9px; color: #64748b;">Emitido em: ${new Date().toLocaleString('pt-BR')}</div>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <div class="card-title">Faturamento Bruto</div>
+            <div class="card-val" style="color: #059669;">${fmt(t.totalFaturado)}</div>
+            <div style="font-size: 9px; color: #64748b; margin-top: 2px;">${t.qtdAutorizadas} nota(s) autorizada(s)</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Base de Cálculo ISS</div>
+            <div class="card-val">${fmt(t.totalBaseCalculo)}</div>
+            <div style="font-size: 9px; color: #64748b; margin-top: 2px;">Descontos: ${fmt(t.totalDescIncond)}</div>
+          </div>
+          <div class="card">
+            <div class="card-title">ISS Devido (Próprio)</div>
+            <div class="card-val" style="color: #b45309;">${fmt(t.totalIssProprio)}</div>
+            <div style="font-size: 9px; color: #64748b; margin-top: 2px;">ISS Retido: ${fmt(t.totalIssRetido)}</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Retenções Federais a Compensar</div>
+            <div class="card-val" style="color: #e11d48;">${fmt(t.totalRetencoesFederais)}</div>
+            <div style="font-size: 9px; color: #64748b; margin-top: 2px;">IRRF + CSRF + INSS</div>
+          </div>
+        </div>
+
+        ${rbt ? `
+        <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; margin-bottom: 16px;">
+          <strong>Termômetro RBT12 (Simples Nacional):</strong> RBT12 Acumulada: <strong>${fmt(rbt.rbt12Oficial)}</strong> | 
+          <strong>Faixa:</strong> ${rbt.faixa.descricao} | 
+          <strong>Alíq. Efetiva Anexo III:</strong> ${rbt.faixa.anexo3.aliqEfetiva} | 
+          <strong>Consumo Sublimite Estadual (R$ 3,6M):</strong> ${rbt.sublimiteEstadual.percentual}% (Saldo: ${fmt(rbt.sublimiteEstadual.saldoRestante)})
+        </div>
+        ` : ''}
+
+        <h2>Detalhamento das NFS-e Emitidas</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>NFS-e</th>
+              <th>Emissão</th>
+              <th>Tomador</th>
+              <th>CNPJ/CPF</th>
+              <th class="text-right">Valor Serviço</th>
+              <th class="text-right">Base Cálculo</th>
+              <th class="text-center">ISS Retido</th>
+              <th class="text-right">ISS Próprio</th>
+              <th class="text-right">Ret. Federais</th>
+              <th class="text-right">Líquido</th>
+              <th class="text-center">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${closing.notas.map(n => `
+              <tr>
+                <td><strong>${n.numeroNfse || n.numeroDps}</strong></td>
+                <td>${n.dataEmissao ? n.dataEmissao.substring(0, 10) : ''}</td>
+                <td>${n.tomador.nome.substring(0, 30)}</td>
+                <td>${n.tomador.doc}</td>
+                <td class="text-right">R$ ${fmtNum(n.valores.valorServico)}</td>
+                <td class="text-right">R$ ${fmtNum(n.valores.baseCalculo)}</td>
+                <td class="text-center">${n.valores.issRetido ? `SIM (R$ ${fmtNum(n.valores.valorIssRetido)})` : 'NÃO'}</td>
+                <td class="text-right">R$ ${fmtNum(n.valores.valorIssProprio)}</td>
+                <td class="text-right">${n.valores.totalRetFederais > 0 ? `R$ ${fmtNum(n.valores.totalRetFederais)}` : '-'}</td>
+                <td class="text-right"><strong>R$ ${fmtNum(n.valores.valorLiquido)}</strong></td>
+                <td class="text-center">${n.status}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div class="footer">
+          Documento gerado eletronicamente pelo Emissor Nacional NFS-e ADN • Bazilio Contabilidade LTDA
+        </div>
+        <script>window.onload = function() { window.print(); };</script>
+      </body>
+      </html>
+    `);
+    w.document.close();
   }
 };
 
