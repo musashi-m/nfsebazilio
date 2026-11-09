@@ -358,17 +358,23 @@ const App = {
       }
     });
 
-    // Alíquotas e outros campos tributários numéricos percentuais
-    [
-      'fAliquotaIss', 'fAliquotaRetencao', 'fAliquotaSimplesNacional',
+    // Formulário de emissão: Máscara percentual em tempo real 0,00%
+    const percentFieldIds = [
+      'fAliquotaRetencao', 'fAliquotaSimplesNacional',
       'fAliqTribFed', 'fAliqTribEst', 'fAliqTribMun'
-    ].forEach(id => {
+    ];
+    percentFieldIds.forEach(id => {
       const el = document.getElementById(id);
       if (el) {
-        el.addEventListener('input', () => this.calculateEmissionTotals());
-        el.addEventListener('change', () => this.calculateEmissionTotals());
+        this.bindPercentMask(el, 100);
       }
     });
+
+    const aliqIssEl = document.getElementById('fAliquotaIss');
+    if (aliqIssEl) {
+      aliqIssEl.addEventListener('input', () => this.calculateEmissionTotals());
+      aliqIssEl.addEventListener('change', () => this.calculateEmissionTotals());
+    }
 
     // Auto-save e validação visual reativa em tempo real no formulário
     const emissionForm = document.getElementById('emissionFormView');
@@ -1055,8 +1061,8 @@ const App = {
     setVal('fDescricaoDeducao', '');
     setRadio('fRetencaoIssqnRadio', 'nao');
     this.handleRetencaoIssqnChange('nao');
-    setVal('fAliquotaIss', '2.00');
-    setVal('fAliquotaRetencao', '2.00');
+    setVal('fAliquotaIss', '2,00');
+    setVal('fAliquotaRetencao', '2,00');
     setVal('fRetIr', '');
     setVal('fRetContrSociais', '');
     setVal('fRetInss', '');
@@ -1067,13 +1073,13 @@ const App = {
     setVal('fRetCp', '');
 
     // Tributos Aproximados
-    setVal('fValTribFed', '0.00');
-    setVal('fValTribEst', '0.00');
-    setVal('fValTribMun', '0.00');
-    setVal('fAliqTribFed', '13.45');
-    setVal('fAliqTribEst', '0.00');
-    setVal('fAliqTribMun', '2.00');
-    setVal('fAliquotaSimplesNacional', '15.50');
+    setVal('fValTribFed', '0,00');
+    setVal('fValTribEst', '0,00');
+    setVal('fValTribMun', '0,00');
+    setVal('fAliqTribFed', '13,45');
+    setVal('fAliqTribEst', '0,00');
+    setVal('fAliqTribMun', '2,00');
+    setVal('fAliquotaSimplesNacional', '15,50');
     setRadio('fModoValorAproxTrib', 'simples');
     this.handleModoTribAproxChange('simples');
 
@@ -1261,7 +1267,7 @@ const App = {
 
         if (isRetido) {
           const aliq = Number(v.iss?.aliquota ?? v.pAliq ?? 2);
-          const aliqStr = aliq > 0 ? aliq.toFixed(2) : '2.00';
+          const aliqStr = aliq > 0 ? aliq.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '2,00';
           setVal('fAliquotaIss', aliqStr);
           setVal('fAliquotaRetencao', aliqStr);
         }
@@ -1571,12 +1577,14 @@ const App = {
     setRadio('fRetencaoIssqnRadio', retIss);
     this.handleRetencaoIssqnChange(retIss);
     if (retIss === 'sim' && template.aliquotaIss) {
-      setVal('fAliquotaIss', Number(template.aliquotaIss).toFixed(2));
+      const aliqFmt = Number(template.aliquotaIss).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      setVal('fAliquotaIss', aliqFmt);
+      setVal('fAliquotaRetencao', aliqFmt);
     }
 
-    if (template.retIr) setVal('fRetIr', Number(template.retIr).toFixed(2));
-    if (template.retContrSociais) setVal('fRetContrSociais', Number(template.retContrSociais).toFixed(2));
-    if (template.retInss) setVal('fRetInss', Number(template.retInss).toFixed(2));
+    if (template.retIr) setVal('fRetIr', Number(template.retIr).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    if (template.retContrSociais) setVal('fRetContrSociais', Number(template.retContrSociais).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    if (template.retInss) setVal('fRetInss', Number(template.retInss).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 
     // 3. Limpa e foca no Tomador
     setVal('fTomadorDoc', '');
@@ -1892,7 +1900,7 @@ const App = {
       case 'fAliquotaRetencao': {
         const retSim = document.querySelector('input[name="fRetencaoIssqnRadio"]:checked')?.value === 'sim';
         if (retSim) {
-          const num = parseFloat(val);
+          const num = this.parseMoney(val);
           valid = !isNaN(num) && num > 0 && num <= 100;
         } else {
           valid = true;
@@ -1900,21 +1908,21 @@ const App = {
         break;
       }
       case 'fAliquotaSimplesNacional': {
-        const num = parseFloat(val);
+        const num = this.parseMoney(val);
         valid = !isNaN(num) && num >= 0 && num <= 100;
         break;
       }
       case 'fValTribFed':
       case 'fValTribEst':
       case 'fValTribMun': {
-        const num = parseFloat(val);
+        const num = this.parseMoney(val);
         valid = !isNaN(num) && num >= 0;
         break;
       }
       case 'fAliqTribFed':
       case 'fAliqTribEst':
       case 'fAliqTribMun': {
-        const num = parseFloat(val);
+        const num = this.parseMoney(val);
         valid = !isNaN(num) && num >= 0 && num <= 100;
         break;
       }
@@ -3086,7 +3094,7 @@ const App = {
 
     const setVal = (id, val) => {
       const el = document.getElementById(id);
-      if (el) el.value = val.toFixed(2);
+      if (el) el.value = val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
     // Alíquotas federais padrão da legislação brasileira para serviços
@@ -5054,12 +5062,12 @@ const App = {
       if (boxOpcoes) boxOpcoes.classList.remove('hidden');
       if (alertAviso) alertAviso.classList.add('hidden');
 
-      // Garante alíquota padrão válida se vazia (2.00%)
-      if (aliqRetInp && (!aliqRetInp.value || parseFloat(aliqRetInp.value) <= 0)) {
-        aliqRetInp.value = '2.00';
+      // Garante alíquota padrão válida se vazia (2,00%)
+      if (aliqRetInp && (!aliqRetInp.value || this.parseMoney(aliqRetInp.value) <= 0)) {
+        aliqRetInp.value = '2,00';
       }
       if (aliqInp) {
-        aliqInp.value = aliqRetInp ? aliqRetInp.value : '2.00';
+        aliqInp.value = aliqRetInp ? aliqRetInp.value : '2,00';
         aliqInp.readOnly = false;
         aliqInp.classList.remove('cursor-not-allowed', 'bg-slate-100');
         aliqInp.classList.add('bg-white');
@@ -5108,7 +5116,7 @@ const App = {
   handleAliquotaRetencaoInput(el) {
     const aliqInp = document.getElementById('fAliquotaIss');
     if (aliqInp) {
-      aliqInp.value = el.value || '2.00';
+      aliqInp.value = el.value || '2,00';
     }
     this.calculateEmissionTotals();
   },
@@ -6132,8 +6140,9 @@ const App = {
 
     if (updateAliq) {
       const aliqInput = document.getElementById('fAliquotaIss');
-      if (aliqInput && (!aliqInput.value || parseFloat(aliqInput.value) <= 0)) {
-        aliqInput.value = item.aliquotaReferencia || '2.0';
+      if (aliqInput && (!aliqInput.value || this.parseMoney(aliqInput.value) <= 0)) {
+        const aRef = this.parseMoney(item.aliquotaReferencia || 2);
+        aliqInput.value = aRef.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         this.calculateEmissionTotals();
       }
       this.suggestNbsForActivity(item.codigo, item.descricao);
@@ -6728,7 +6737,7 @@ const App = {
     if (typeof val === 'number') return isNaN(val) ? 0 : val;
     if (!val) return 0;
     const str = String(val).trim();
-    const clean = str.replace(/[R$\s]/g, '');
+    const clean = str.replace(/[R$%\s]/g, '');
     if (!clean) return 0;
     if (clean.includes(',')) {
       const normalized = clean.replace(/\./g, '').replace(',', '.');
@@ -6791,6 +6800,74 @@ const App = {
     // Se já veio com algum valor prévio numérico, formata
     if (input.value && !input.value.includes(',')) {
       format();
+    }
+  },
+
+  bindPercentMask(input, max = 100) {
+    if (!input) return;
+
+    const format = () => {
+      let digits = (input.value || '').replace(/\D/g, '');
+      if (!digits) {
+        input.value = '';
+        return;
+      }
+      if (/^0+$/.test(digits)) {
+        input.value = '0,00';
+        return;
+      }
+      digits = digits.replace(/^0+/, '');
+      const num = parseFloat(digits) / 100;
+      if (max && num > max) {
+        digits = String(Math.round(max * 100));
+      }
+      if (digits.length === 1) {
+        input.value = '0,0' + digits;
+      } else if (digits.length === 2) {
+        input.value = '0,' + digits;
+      } else {
+        const intPart = digits.slice(0, -2);
+        const decPart = digits.slice(-2);
+        const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        input.value = `${formattedInt},${decPart}`;
+      }
+    };
+
+    input.addEventListener('input', () => {
+      format();
+      if (input.id === 'fAliquotaRetencao') {
+        const aliqIss = document.getElementById('fAliquotaIss');
+        if (aliqIss) aliqIss.value = input.value || '2,00';
+      }
+      this.calculateEmissionTotals();
+    });
+
+    input.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const text = (e.clipboardData || window.clipboardData)?.getData('text') || '';
+      const num = this.parseMoney(text);
+      if (num >= 0) {
+        const capped = max ? Math.min(num, max) : num;
+        input.value = capped.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      } else {
+        input.value = '';
+      }
+      if (input.id === 'fAliquotaRetencao') {
+        const aliqIss = document.getElementById('fAliquotaIss');
+        if (aliqIss) aliqIss.value = input.value || '2,00';
+      }
+      this.calculateEmissionTotals();
+    });
+
+    if (input.value) {
+      if (input.value.includes('.')) {
+        const num = parseFloat(input.value);
+        if (!isNaN(num)) {
+          input.value = num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+      } else if (!input.value.includes(',')) {
+        format();
+      }
     }
   }
 };
