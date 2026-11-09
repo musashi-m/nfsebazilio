@@ -452,9 +452,41 @@ const App = {
       });
     }
 
-    // CEP do Tomador: Busca automática
+    // CEP do Prestador: Formatação e busca automática em tempo real
+    const prestCepInput = document.getElementById('fPrestadorCep');
+    if (prestCepInput) {
+      prestCepInput.addEventListener('input', (e) => {
+        let v = e.target.value.replace(/\D/g, '');
+        if (v.length > 8) v = v.substring(0, 8);
+        if (v.length > 5) {
+          e.target.value = v.substring(0, 5) + '-' + v.substring(5);
+        } else {
+          e.target.value = v;
+        }
+        if (v.length === 8) {
+          this.consultarCepPrestador(v);
+        }
+      });
+      prestCepInput.addEventListener('blur', (e) => {
+        this.consultarCepPrestador(e.target.value);
+      });
+    }
+
+    // CEP do Tomador: Formatação e busca automática em tempo real
     const cepInput = document.getElementById('fTomadorCep');
     if (cepInput) {
+      cepInput.addEventListener('input', (e) => {
+        let v = e.target.value.replace(/\D/g, '');
+        if (v.length > 8) v = v.substring(0, 8);
+        if (v.length > 5) {
+          e.target.value = v.substring(0, 5) + '-' + v.substring(5);
+        } else {
+          e.target.value = v;
+        }
+        if (v.length === 8) {
+          this.consultarCep(v);
+        }
+      });
       cepInput.addEventListener('blur', (e) => {
         this.consultarCep(e.target.value);
       });
@@ -839,8 +871,39 @@ const App = {
     setVal('fLocalPrestacaoIbge', codIbge);
     const nomeCidade = comp.municipioNome ? `${comp.municipioNome}/${comp.uf || 'SE'}` : (IBGE_MUNICIPIOS_MAP[codIbge] || 'Aracaju/SE');
     setVal('fMunicipioIncidencia', nomeCidade);
-    this.atualizarDisplayMunicipio(codIbge, 'prestador');
-    this.atualizarDisplayMunicipio(codIbge, 'local');
+    this.atualizarDisplayMunicipio(codIbge, 'prestador', nomeCidade);
+    this.atualizarDisplayMunicipio(codIbge, 'local', nomeCidade);
+
+    // Se faltar logradouro ou CEP na representação selecionada, busca enriquecimento automático
+    if ((!comp.logradouro || !comp.cep) && comp.cnpj) {
+      const cleanDoc = (comp.cnpjRaw || comp.cnpj).replace(/\D/g, '');
+      if (cleanDoc.length === 14) {
+        safeFetchJson(`/api/aux/cnpj/${cleanDoc}`).then(res => {
+          if (res && res.success && res.data) {
+            const d = res.data;
+            if (d.cep && !document.getElementById('fPrestadorCep')?.value) {
+              setVal('fPrestadorCep', d.cep);
+            }
+            if (d.logradouro && !document.getElementById('fPrestadorLogradouro')?.value) {
+              setVal('fPrestadorLogradouro', d.logradouro);
+            }
+            if (d.numero && !document.getElementById('fPrestadorNumero')?.value) {
+              setVal('fPrestadorNumero', d.numero);
+            }
+            if (d.bairro && !document.getElementById('fPrestadorBairro')?.value) {
+              setVal('fPrestadorBairro', d.bairro);
+            }
+            if (d.municipioIbge) {
+              const cod = d.municipioIbge;
+              const nome = `${d.municipio}/${d.uf || 'SE'}`;
+              IBGE_MUNICIPIOS_MAP[cod] = nome;
+              this.atualizarDisplayMunicipio(cod, 'prestador', nome);
+              this.atualizarDisplayMunicipio(cod, 'local', nome);
+            }
+          }
+        }).catch(() => {});
+      }
+    }
 
     const hoje = new Date().toISOString().substring(0, 10);
     setVal('fDataCompetencia', hoje);
@@ -2638,14 +2701,23 @@ const App = {
     if (munIncid) munIncid.value = nomeUf;
   },
 
-  atualizarDisplayMunicipio(codigoIbge, tipo) {
+  atualizarDisplayMunicipio(codigoIbge, tipo, fallbackNome = null) {
     if (!codigoIbge) return;
-    const nomeUf = IBGE_MUNICIPIOS_MAP[codigoIbge] || codigoIbge;
+    if (fallbackNome && (!IBGE_MUNICIPIOS_MAP[codigoIbge] || IBGE_MUNICIPIOS_MAP[codigoIbge] === codigoIbge)) {
+      IBGE_MUNICIPIOS_MAP[codigoIbge] = fallbackNome;
+    }
+    const nomeUf = fallbackNome || IBGE_MUNICIPIOS_MAP[codigoIbge] || codigoIbge;
     const isLocal = tipo === 'local';
     const inputSearch = document.getElementById(isLocal ? 'fLocalPrestacaoSearch' : 'fMunicipioPrestadorSearch');
     const inputHidden = document.getElementById(isLocal ? 'fLocalPrestacaoIbge' : 'fMunicipioIbge');
     if (inputSearch) inputSearch.value = nomeUf;
     if (inputHidden) inputHidden.value = codigoIbge;
+    if (tipo === 'prestador') {
+      const prestSelect = document.getElementById('fMunicipioPrestadorSelect');
+      if (prestSelect) prestSelect.value = codigoIbge;
+      const munIncid = document.getElementById('fMunicipioIncidencia');
+      if (munIncid) munIncid.value = nomeUf;
+    }
   },
 
   handleMunicipioPrestadorChange(val) {
@@ -2695,6 +2767,9 @@ const App = {
   },
 
   async buscarCepGenerico(cepId, lgrId, bairroId, munId, ufId) {
+    if (cepId === 'fPrestadorCep') {
+      return this.consultarCepPrestador(document.getElementById('fPrestadorCep')?.value);
+    }
     const cepInput = document.getElementById(cepId);
     if (!cepInput) return;
     const cleanCep = (cepInput.value || '').replace(/\D/g, '');
@@ -2705,42 +2780,47 @@ const App = {
     }
 
     try {
-      const res = await fetch(`https://brasilapi.com.br/api/cep/v1/${cleanCep}`);
-      if (!res.ok) throw new Error('CEP não encontrado');
-      const data = await res.json();
-      
-      const setV = (id, v) => {
-        const el = document.getElementById(id);
-        if (el && v) el.value = v;
-      };
-
-      if (lgrId) setV(lgrId, data.street);
-      if (bairroId) setV(bairroId, data.neighborhood);
-      if (munId) setV(munId, data.city);
-      if (ufId) setV(ufId, data.state);
-      this.showToast(`Endereço carregado para o CEP ${cleanCep}!`);
-    } catch (e) {
-      try {
-        const res2 = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
-        const data2 = await res2.json();
-        if (data2.erro) throw new Error('CEP não encontrado');
+      const res = await safeFetchJson(`/api/aux/cep/${cleanCep}`);
+      if (res && res.success && res.data) {
+        const data = res.data;
         const setV = (id, v) => {
           const el = document.getElementById(id);
           if (el && v) el.value = v;
         };
-        if (lgrId) setV(lgrId, data2.logradouro);
-        if (bairroId) setV(bairroId, data2.bairro);
-        if (munId) setV(munId, data2.localidade);
-        if (ufId) setV(ufId, data2.uf);
-        if (data2.ibge) {
-          setV('fTomadorMunIbge', data2.ibge);
+        if (lgrId) setV(lgrId, data.logradouro);
+        if (bairroId) setV(bairroId, data.bairro);
+        if (munId) setV(munId, data.municipio);
+        if (ufId) setV(ufId, data.uf);
+        if (data.ibge) {
+          setV('fTomadorMunIbge', data.ibge);
           const tomDoc = document.getElementById('fTomadorDoc');
-          if (tomDoc) tomDoc.dataset.municipioIbge = data2.ibge;
+          if (tomDoc) tomDoc.dataset.municipioIbge = data.ibge;
         }
-        this.showToast(`Endereço carregado via ViaCEP!`);
-      } catch (err2) {
-        alert('Não foi possível localizar o endereço para o CEP informado.');
+        this.showToast(`Endereço carregado para o CEP ${cleanCep}!`);
+        return;
       }
+    } catch (_) {}
+
+    try {
+      const res2 = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const data2 = await res2.json();
+      if (data2.erro) throw new Error('CEP não encontrado');
+      const setV = (id, v) => {
+        const el = document.getElementById(id);
+        if (el && v) el.value = v;
+      };
+      if (lgrId) setV(lgrId, data2.logradouro);
+      if (bairroId) setV(bairroId, data2.bairro);
+      if (munId) setV(munId, data2.localidade);
+      if (ufId) setV(ufId, data2.uf);
+      if (data2.ibge) {
+        setV('fTomadorMunIbge', data2.ibge);
+        const tomDoc = document.getElementById('fTomadorDoc');
+        if (tomDoc) tomDoc.dataset.municipioIbge = data2.ibge;
+      }
+      this.showToast(`Endereço carregado via ViaCEP!`);
+    } catch (err2) {
+      alert('Não foi possível localizar o endereço para o CEP informado.');
     }
   },
 
@@ -6514,29 +6594,122 @@ const App = {
     el.value = v;
   },
 
-  async consultarCep(cepVal) {
-    const clean = (cepVal || '').replace(/\D/g, '');
+  async consultarCepPrestador(cepVal) {
+    const inputEl = document.getElementById('fPrestadorCep');
+    const clean = (cepVal || (inputEl ? inputEl.value : '')).replace(/\D/g, '');
     if (clean.length !== 8) return;
 
+    if (inputEl) {
+      inputEl.value = clean.replace(/^(\d{5})(\d{3})$/, '$1-$2');
+    }
+
+    let data = null;
+    // 1. Tenta endpoint seguro do backend
     try {
-      const res = await fetch(`https://viacep.com.br/ws/${clean}/json/`).then(r => r.json());
-      if (!res.erro) {
-        const setVal = (id, val) => {
-          const el = document.getElementById(id);
-          if (el && val) el.value = val;
-        };
-        setVal('fTomadorLogradouro', res.logradouro);
-        setVal('fTomadorBairro', res.bairro);
-        setVal('fTomadorMunicipio', res.localidade);
-        setVal('fTomadorUf', res.uf);
-        if (res.ibge) {
-          setVal('fTomadorMunIbge', res.ibge);
-          const tomDoc = document.getElementById('fTomadorDoc');
-          if (tomDoc) tomDoc.dataset.municipioIbge = res.ibge;
-        }
+      const res = await safeFetchJson(`/api/aux/cep/${clean}`);
+      if (res && res.success && res.data) {
+        data = res.data;
       }
-    } catch (e) {
-      console.warn('Erro ao consultar CEP:', e);
+    } catch (_) {}
+
+    // 2. Fallback direto ViaCEP
+    if (!data) {
+      try {
+        const resVia = await fetch(`https://viacep.com.br/ws/${clean}/json/`).then(r => r.json());
+        if (resVia && !resVia.erro) {
+          data = {
+            logradouro: resVia.logradouro || '',
+            bairro: resVia.bairro || '',
+            municipio: resVia.localidade || '',
+            uf: resVia.uf || '',
+            ibge: resVia.ibge || ''
+          };
+        }
+      } catch (_) {}
+    }
+
+    if (!data) {
+      this.showToast('CEP não localizado nas bases públicas.', 'warning');
+      return;
+    }
+
+    const setVal = (id, val) => {
+      const el = document.getElementById(id);
+      if (el && val) el.value = val;
+    };
+
+    if (data.logradouro) setVal('fPrestadorLogradouro', data.logradouro);
+    if (data.bairro) setVal('fPrestadorBairro', data.bairro);
+
+    if (data.ibge || (data.municipio && data.uf)) {
+      const codIbge = data.ibge || '2800308';
+      const nomeCidade = `${data.municipio}/${data.uf || 'SE'}`;
+      this.atualizarDisplayMunicipio(codIbge, 'prestador', nomeCidade);
+      this.atualizarDisplayMunicipio(codIbge, 'local', nomeCidade);
+    }
+
+    const numEl = document.getElementById('fPrestadorNumero');
+    if (numEl && !numEl.value) {
+      numEl.focus();
+    }
+
+    this.showToast(`Endereço do prestador carregado com sucesso (${data.municipio || 'Cidade'}/${data.uf || 'UF'})!`);
+  },
+
+  async consultarCep(cepVal) {
+    const inputEl = document.getElementById('fTomadorCep');
+    const clean = (cepVal || (inputEl ? inputEl.value : '')).replace(/\D/g, '');
+    if (clean.length !== 8) return;
+
+    if (inputEl) {
+      inputEl.value = clean.replace(/^(\d{5})(\d{3})$/, '$1-$2');
+    }
+
+    let data = null;
+    // 1. Tenta endpoint seguro do backend
+    try {
+      const res = await safeFetchJson(`/api/aux/cep/${clean}`);
+      if (res && res.success && res.data) {
+        data = res.data;
+      }
+    } catch (_) {}
+
+    // 2. Fallback direto ViaCEP
+    if (!data) {
+      try {
+        const resVia = await fetch(`https://viacep.com.br/ws/${clean}/json/`).then(r => r.json());
+        if (resVia && !resVia.erro) {
+          data = {
+            logradouro: resVia.logradouro || '',
+            bairro: resVia.bairro || '',
+            municipio: resVia.localidade || '',
+            uf: resVia.uf || '',
+            ibge: resVia.ibge || ''
+          };
+        }
+      } catch (_) {}
+    }
+
+    if (!data) return;
+
+    const setVal = (id, val) => {
+      const el = document.getElementById(id);
+      if (el && val) el.value = val;
+    };
+
+    setVal('fTomadorLogradouro', data.logradouro || '');
+    setVal('fTomadorBairro', data.bairro || '');
+    setVal('fTomadorMunicipio', data.municipio || '');
+    setVal('fTomadorUf', data.uf || '');
+    if (data.ibge) {
+      setVal('fTomadorMunIbge', data.ibge);
+      const tomDoc = document.getElementById('fTomadorDoc');
+      if (tomDoc) tomDoc.dataset.municipioIbge = data.ibge;
+    }
+
+    const numEl = document.getElementById('fTomadorNumero');
+    if (numEl && !numEl.value) {
+      numEl.focus();
     }
   }
 };

@@ -233,6 +233,31 @@ class RepresentationService {
           opSimpNac: 3
         };
 
+        const xml = n.xmlCompleto || n.xmlAssinado;
+        if (xml) {
+          const toma = xmlParserService.getTag(xml, 'toma');
+          const end = xmlParserService.getTag(toma, 'end');
+          const endNac = xmlParserService.getTag(end, 'endNac');
+          if (end) {
+            res.logradouro = res.logradouro || xmlParserService.getTag(end, 'xLgr') || '';
+            res.numero = res.numero || xmlParserService.getTag(end, 'nro') || '';
+            res.complemento = res.complemento || xmlParserService.getTag(end, 'xCpl') || '';
+            res.bairro = res.bairro || xmlParserService.getTag(end, 'xBairro') || '';
+            res.cep = res.cep || (xmlParserService.getTag(endNac, 'CEP') || xmlParserService.getTag(end, 'CEP') || '').replace(/\D/g, '');
+            const cMun = xmlParserService.getTag(endNac, 'cMun') || '';
+            if (cMun) {
+              res.municipioIbge = cMun;
+              if (cMun === '2802403') {
+                res.municipioNome = 'Gararu';
+                res.uf = 'SE';
+              }
+            }
+          }
+          if (!res.telefone) {
+            res.telefone = xmlParserService.getTag(toma, 'fone') || '';
+          }
+        }
+
         if (!res.municipioIbge && res.municipioNome) {
           res.municipioIbge = this._findIbgeByCity(res.municipioNome, res.uf);
         }
@@ -250,15 +275,16 @@ class RepresentationService {
   async _fetchCompanyOnline(cleanDoc) {
     const formattedDoc = cleanDoc.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
 
-    // Fonte 1: BrasilAPI
+    // Fonte 1: MinhaReceita (Rápida, sem rate limit severo e com código IBGE oficial)
     try {
-      const resp = await axios.get(`https://brasilapi.com.br/api/cnpj/v1/${cleanDoc}`, {
+      const resp = await axios.get(`https://minhareceita.org/${cleanDoc}`, {
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
         timeout: 5000
       });
       if (resp.data && resp.data.razao_social) {
         const d = resp.data;
         const munIbge = d.codigo_municipio_ibge ? String(d.codigo_municipio_ibge) : this._findIbgeByCity(d.municipio, d.uf);
+        const tipoLgr = d.descricao_tipo_de_logradouro ? `${d.descricao_tipo_de_logradouro} ` : '';
         return {
           cnpj: formattedDoc,
           cnpjRaw: cleanDoc,
@@ -267,8 +293,8 @@ class RepresentationService {
           municipioIbge: munIbge || '2800308',
           municipioNome: d.municipio || '',
           uf: d.uf || '',
-          logradouro: d.logradouro || '',
-          numero: d.numero || '',
+          logradouro: `${tipoLgr}${d.logradouro || ''}`.trim(),
+          numero: d.numero || 'S/N',
           complemento: d.complemento || '',
           bairro: d.bairro || '',
           cep: (d.cep || '').replace(/\D/g, ''),
@@ -281,7 +307,39 @@ class RepresentationService {
       }
     } catch (_) {}
 
-    // Fonte 2: ReceitaWS
+    // Fonte 2: BrasilAPI
+    try {
+      const resp = await axios.get(`https://brasilapi.com.br/api/cnpj/v1/${cleanDoc}`, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+        timeout: 5000
+      });
+      if (resp.data && resp.data.razao_social) {
+        const d = resp.data;
+        const munIbge = d.codigo_municipio_ibge ? String(d.codigo_municipio_ibge) : this._findIbgeByCity(d.municipio, d.uf);
+        const fullLgr = [d.descricao_tipo_de_logradouro, d.logradouro].filter(Boolean).join(' ') || d.logradouro || '';
+        return {
+          cnpj: formattedDoc,
+          cnpjRaw: cleanDoc,
+          razaoSocial: d.razao_social,
+          nomeFantasia: d.nome_fantasia || '',
+          municipioIbge: munIbge || '2800308',
+          municipioNome: d.municipio || '',
+          uf: d.uf || '',
+          logradouro: fullLgr,
+          numero: d.numero || 'S/N',
+          complemento: d.complemento || '',
+          bairro: d.bairro || '',
+          cep: (d.cep || '').replace(/\D/g, ''),
+          telefone: d.ddd_telefone_1 || '',
+          email: d.email || '',
+          cnae: d.cnae_fiscal ? String(d.cnae_fiscal) : '',
+          regimeTributario: 1,
+          opSimpNac: 3
+        };
+      }
+    } catch (_) {}
+
+    // Fonte 3: ReceitaWS
     try {
       const resp = await axios.get(`https://receitaws.com.br/v1/cnpj/${cleanDoc}`, {
         headers: { 'User-Agent': 'Mozilla/5.0' },
@@ -299,44 +357,13 @@ class RepresentationService {
           municipioNome: d.municipio || '',
           uf: d.uf || '',
           logradouro: d.logradouro || '',
-          numero: d.numero || '',
+          numero: d.numero || 'S/N',
           complemento: d.complemento || '',
           bairro: d.bairro || '',
           cep: (d.cep || '').replace(/\D/g, ''),
           telefone: d.telefone || '',
           email: d.email || '',
           cnae: d.atividade_principal && d.atividade_principal[0] ? String(d.atividade_principal[0].code).replace(/\D/g, '') : '',
-          regimeTributario: 1,
-          opSimpNac: 3
-        };
-      }
-    } catch (_) {}
-
-    // Fonte 3: MinhaReceita
-    try {
-      const resp = await axios.get(`https://minhareceita.org/${cleanDoc}`, {
-        headers: { 'User-Agent': 'Mozilla/5.0' },
-        timeout: 5000
-      });
-      if (resp.data && resp.data.razao_social) {
-        const d = resp.data;
-        const munIbge = d.codigo_municipio_ibge ? String(d.codigo_municipio_ibge) : this._findIbgeByCity(d.municipio, d.uf);
-        return {
-          cnpj: formattedDoc,
-          cnpjRaw: cleanDoc,
-          razaoSocial: d.razao_social,
-          nomeFantasia: d.nome_fantasia || '',
-          municipioIbge: munIbge || '2800308',
-          municipioNome: d.municipio || '',
-          uf: d.uf || '',
-          logradouro: d.logradouro || '',
-          numero: d.numero || '',
-          complemento: d.complemento || '',
-          bairro: d.bairro || '',
-          cep: (d.cep || '').replace(/\D/g, ''),
-          telefone: d.ddd_telefone_1 || '',
-          email: d.email || '',
-          cnae: d.cnae_fiscal ? String(d.cnae_fiscal) : '',
           regimeTributario: 1,
           opSimpNac: 3
         };
@@ -355,62 +382,80 @@ class RepresentationService {
       ? cleanDoc.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')
       : cleanDoc.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
 
-    const isPlaceholder = !currentData ||
-      !currentData.razaoSocial ||
-      currentData.razaoSocial.startsWith('EMPRESA CNPJ') ||
-      currentData.razaoSocial.startsWith('CONTRIBUINTE CPF') ||
-      (!currentData.logradouro && isCnpj) ||
-      (!currentData.im && isCnpj);
+    let companyData = currentData ? { ...currentData } : null;
 
-    // Se já temos dados completos e válidos, apenas atualiza timestamp
-    if (!isPlaceholder && currentData.municipioIbge && currentData.municipioIbge !== '3550308') {
-      return {
-        ...currentData,
-        lastUsedAt: currentData.lastUsedAt || new Date().toISOString()
-      };
-    }
-
-    // 1. Tenta extrair do histórico de notas (dados 100% oficiais emitidos no ADN)
+    // 1. Tenta extrair do histórico de notas (dados oficiais emitidos no ADN)
     const fromHistory = this._findCompanyInHistory(cleanDoc);
     if (fromHistory) {
-      return {
-        ...(currentData || {}),
-        ...fromHistory,
-        lastUsedAt: new Date().toISOString()
+      companyData = {
+        ...(companyData || {}),
+        ...fromHistory
       };
     }
 
-    // 2. Se for CNPJ, consulta bases públicas online
-    if (isCnpj) {
+    // 2. Se for CNPJ e ainda faltar dados essenciais (endereço, CEP, município), busca online na Receita Federal
+    const needsOnline = isCnpj && (
+      !companyData ||
+      !companyData.razaoSocial ||
+      !companyData.logradouro ||
+      !companyData.cep ||
+      !companyData.municipioIbge ||
+      companyData.razaoSocial.startsWith('EMPRESA CNPJ')
+    );
+
+    if (needsOnline) {
       const fromOnline = await this._fetchCompanyOnline(cleanDoc);
       if (fromOnline) {
-        return {
-          ...(currentData || {}),
+        companyData = {
+          ...(companyData || {}),
           ...fromOnline,
-          im: (currentData && currentData.im) || fromOnline.im || '',
-          lastUsedAt: new Date().toISOString()
+          im: (companyData && companyData.im) || fromOnline.im || '',
+          telefone: (companyData && companyData.telefone) || fromOnline.telefone || ''
         };
       }
     }
 
-    // 3. Fallback inteligente (mantém o que tiver ou monta estrutura base)
+    // 3. Se temos CEP mas ainda não temos logradouro ou bairro, consulta ViaCEP
+    if (companyData && companyData.cep && (!companyData.logradouro || !companyData.bairro || !companyData.municipioNome)) {
+      try {
+        const cleanCep = String(companyData.cep).replace(/\D/g, '');
+        if (cleanCep.length === 8) {
+          const via = await axios.get(`https://viacep.com.br/ws/${cleanCep}/json/`, {
+            timeout: 3500,
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+          });
+          if (via.data && !via.data.erro) {
+            companyData.logradouro = companyData.logradouro || via.data.logradouro || '';
+            companyData.bairro = companyData.bairro || via.data.bairro || '';
+            companyData.municipioNome = companyData.municipioNome || via.data.localidade || '';
+            companyData.uf = companyData.uf || via.data.uf || '';
+            companyData.municipioIbge = companyData.municipioIbge || via.data.ibge || '';
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (companyData) {
+      companyData.lastUsedAt = new Date().toISOString();
+      return companyData;
+    }
+
+    // 4. Fallback base
     return {
       cnpj: formattedDoc,
       cnpjRaw: cleanDoc,
-      razaoSocial: (currentData && currentData.razaoSocial && !currentData.razaoSocial.startsWith('EMPRESA CNPJ'))
-        ? currentData.razaoSocial
-        : (isCnpj ? `EMPRESA CNPJ ${formattedDoc}` : `CONTRIBUINTE CPF ${formattedDoc}`),
-      nomeFantasia: (currentData && currentData.nomeFantasia) || '',
-      municipioIbge: (currentData && currentData.municipioIbge) || '2800308',
-      municipioNome: (currentData && currentData.municipioNome) || 'Aracaju',
-      uf: (currentData && currentData.uf) || 'SE',
-      logradouro: (currentData && currentData.logradouro) || '',
-      numero: (currentData && currentData.numero) || '',
-      bairro: (currentData && currentData.bairro) || '',
-      cep: (currentData && currentData.cep) || '',
-      im: (currentData && currentData.im) || '',
-      regimeTributario: (currentData && currentData.regimeTributario) || 1,
-      opSimpNac: (currentData && currentData.opSimpNac) || 3,
+      razaoSocial: isCnpj ? `EMPRESA CNPJ ${formattedDoc}` : `CONTRIBUINTE CPF ${formattedDoc}`,
+      nomeFantasia: '',
+      municipioIbge: '2800308',
+      municipioNome: 'Aracaju',
+      uf: 'SE',
+      logradouro: '',
+      numero: '',
+      bairro: '',
+      cep: '',
+      im: '',
+      regimeTributario: 1,
+      opSimpNac: 3,
       lastUsedAt: new Date().toISOString()
     };
   }

@@ -490,6 +490,96 @@ app.get('/api/aux/cnpj/:cnpj', async (req, res) => {
   });
 });
 
+// Consulta unificada e resiliente de CEP (ViaCEP -> BrasilAPI -> AwesomeAPI)
+app.get('/api/aux/cep/:cep', async (req, res) => {
+  const clean = (req.params.cep || '').replace(/\D/g, '');
+  if (!clean || clean.length !== 8) {
+    return res.status(400).json({
+      success: false,
+      error: 'CEP deve conter exatamente 8 dígitos numéricos.'
+    });
+  }
+
+  const formattedCep = clean.replace(/^(\d{5})(\d{3})$/, '$1-$2');
+
+  // 1. Tenta ViaCEP
+  try {
+    const viaRes = await axios.get(`https://viacep.com.br/ws/${clean}/json/`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+      timeout: 4500
+    });
+    if (viaRes.data && !viaRes.data.erro) {
+      const d = viaRes.data;
+      return res.json({
+        success: true,
+        source: 'ViaCEP',
+        data: {
+          cep: formattedCep,
+          cepRaw: clean,
+          logradouro: d.logradouro || '',
+          bairro: d.bairro || '',
+          municipio: d.localidade || '',
+          uf: d.uf || '',
+          ibge: d.ibge || ''
+        }
+      });
+    }
+  } catch (_) {}
+
+  // 2. Fallback BrasilAPI
+  try {
+    const bRes = await axios.get(`https://brasilapi.com.br/api/cep/v2/${clean}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+      timeout: 4500
+    });
+    if (bRes.data && bRes.data.cep) {
+      const d = bRes.data;
+      return res.json({
+        success: true,
+        source: 'BrasilAPI',
+        data: {
+          cep: formattedCep,
+          cepRaw: clean,
+          logradouro: d.street || '',
+          bairro: d.neighborhood || '',
+          municipio: d.city || '',
+          uf: d.state || '',
+          ibge: d.ibge || ''
+        }
+      });
+    }
+  } catch (_) {}
+
+  // 3. Fallback AwesomeAPI
+  try {
+    const aRes = await axios.get(`https://cep.awesomeapi.com.br/json/${clean}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+      timeout: 4500
+    });
+    if (aRes.data && aRes.data.cep) {
+      const d = aRes.data;
+      return res.json({
+        success: true,
+        source: 'AwesomeAPI',
+        data: {
+          cep: formattedCep,
+          cepRaw: clean,
+          logradouro: d.address || '',
+          bairro: d.district || '',
+          municipio: d.city || '',
+          uf: d.state || '',
+          ibge: d.city_ibge || ''
+        }
+      });
+    }
+  } catch (_) {}
+
+  res.status(404).json({
+    success: false,
+    error: 'Não foi possível localizar o endereço para o CEP informado.'
+  });
+});
+
 // Consulta e preenchimento inteligente de Tomador por CPF ou CNPJ
 app.get('/api/aux/tomador', async (req, res) => {
   const doc = (req.query.doc || '').replace(/\D/g, '');
