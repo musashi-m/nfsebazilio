@@ -4,6 +4,22 @@
  */
 
 const ERROR_DICTIONARY = [
+  // --- ASSINATURA COM CERTIFICADO DO PROCURADOR / FALTA DE PROCURAÇÃO NO FISCO ---
+  {
+    regex: /(A assinatura deve ser feita com o certificado digital do emitente da DPS|E0718|E0696|certificado digital do emitente da dps)/i,
+    category: 'Procuração Eletrônica RFB / Assinatura da DPS',
+    title: 'Assinatura Recusada: Procuração da NFS-e Não Localizada no Fisco',
+    friendlyMessage: 'A SEFIN Nacional (Receita Federal) barrou a emissão porque o certificado utilizado (Bazilio Contabilidade) é diferente do CNPJ da empresa prestadora e o Fisco não localizou uma Procuração Eletrônica ativa para esta empresa com permissão para o serviço de NFS-e.',
+    howToFix: [
+      'Empresa nunca foi cliente? Se este CNPJ nunca outorgou procuração para a Bazilio Contabilidade, a Receita Federal proíbe a emissão por terceiros sem a outorga legal.',
+      'A empresa é cliente? Acesse o Portal e-CAC da Receita Federal com o login/certificado do cliente.',
+      'Vá em "Procurações" > "Cadastrar Procuração" (ou consultar a existente) e outorgue para o CNPJ 12.627.708/0001-56.',
+      'ATENÇÃO: É obrigatório que a procuração inclua especificamente a caixinha "NFS-e - Nota Fiscal de Serviço Eletrônica" (a procuração geral antiga de tributos federais NÃO cobre a NFS-e Nacional automaticamente).',
+      'Caso a procuração tenha sido cadastrada hoje, a Receita Federal leva de 30 minutos a 2 horas para propagar a autorização nos servidores de emissão da SEFIN Nacional.',
+      'Alternativa Imediata: Se o cliente possui o arquivo de certificado A1 próprio (.pfx), selecione e importe o certificado da empresa diretamente no painel para emitir assinado por ele.'
+    ],
+    severity: 'error'
+  },
   // --- PROCURAÇÃO E REPRESENTAÇÃO ---
   {
     regex: /(procura[cç][aã]o|n[aã]o autorizado a emitir por este cnpj|representa[cç][aã]o|outorgante|n[aã]o possui autoriza[cç][aã]o|E001|E101)/i,
